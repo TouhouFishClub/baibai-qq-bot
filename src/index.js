@@ -3,6 +3,10 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const config = require('./config');
+require('dotenv').config();
+
+// 引入中间件
+const verifySignature = require('../middlewares/signatureVerification');
 
 // 引入路由
 const apiRoutes = require('../routes/api');
@@ -10,14 +14,14 @@ const webhookController = require('../controllers/webhookController');
 
 // 初始化Express应用
 const app = express();
-const PORT = config.server.port;
+const PORT = process.env.PORT || config.server.port;
 
 // 中间件
 if (config.security.enableCors) {
   const corsOptions = {
     origin: config.security.allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'x-api-key']
+    allowedHeaders: ['Content-Type', 'x-api-key', 'x-signature-ed25519', 'x-signature-timestamp']
   };
   app.use(cors(corsOptions));
 }
@@ -34,8 +38,8 @@ app.use((req, res, next) => {
 // 路由
 app.use('/api', apiRoutes);
 
-// QQ Webhook 路由 - 直接放在根路径
-app.post('/qq/webhook', webhookController.handleWebhook);
+// QQ Webhook 路由 - 使用签名验证中间件
+app.post('/qq/webhook', verifySignature, webhookController.handleWebhook);
 
 // 基础路由
 app.get('/', (req, res) => {
