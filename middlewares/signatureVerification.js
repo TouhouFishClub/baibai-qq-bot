@@ -8,19 +8,9 @@ const ed25519 = require('ed25519');
  */
 const verifySignature = (req, res, next) => {
   try {
-    console.log('=== 签名验证调试信息 ===');
-    console.log('请求头:', req.headers);
-    console.log('请求体:', req.body);
-    
     const signature = req.headers['x-signature-ed25519'];
     const timestamp = req.headers['x-signature-timestamp'];
     const botSecret = process.env.QQ_BOT_SECRET;
-
-    console.log('签名信息:', {
-      signature: signature ? '已提供' : '未提供',
-      timestamp: timestamp ? '已提供' : '未提供',
-      botSecret: botSecret ? '已配置' : '未配置'
-    });
 
     if (!signature) {
       console.error('错误: 缺少 X-Signature-Ed25519 头');
@@ -53,27 +43,15 @@ const verifySignature = (req, res, next) => {
     }
     seed = seed.slice(0, 32);
 
-    console.log('生成的seed:', seed);
-    console.log('seed长度:', seed.length);
-
     // 生成密钥对
     const keyPair = ed25519.MakeKeypair(Buffer.from(seed));
-    console.log('公钥:', keyPair.publicKey.toString('hex'));
 
     // 构建签名消息 - 按照文档要求使用 timestamp + body
     const body = JSON.stringify(req.body);
     const message = timestamp + body;
 
-    console.log('签名消息:', {
-      timestamp,
-      body,
-      message
-    });
-
     // 将签名从十六进制转换为Buffer
     const signatureBuffer = Buffer.from(signature, 'hex');
-    console.log('签名Buffer:', signatureBuffer);
-    console.log('签名长度:', signatureBuffer.length);
 
     // 验证签名
     const isValid = ed25519.Verify(
@@ -82,25 +60,11 @@ const verifySignature = (req, res, next) => {
       keyPair.publicKey
     );
 
-    console.log('签名验证结果:', isValid ? '通过' : '失败');
-
     if (!isValid) {
-      // 尝试重新计算签名进行对比
-      const calculatedSignature = ed25519.Sign(
-        Buffer.from(message),
-        keyPair.privateKey
-      );
-      console.log('计算出的签名:', calculatedSignature.toString('hex'));
-      console.log('原始签名:', signature);
-
+      console.error('签名验证失败');
       return res.status(401).json({ 
         error: '签名验证失败',
-        details: '提供的签名与计算出的签名不匹配',
-        debug: {
-          message,
-          calculatedSignature: calculatedSignature.toString('hex'),
-          providedSignature: signature
-        }
+        details: '提供的签名验证失败'
       });
     }
 
@@ -109,8 +73,7 @@ const verifySignature = (req, res, next) => {
     console.error('签名验证错误:', error);
     return res.status(500).json({ 
       error: '签名验证过程出错',
-      details: error.message,
-      stack: error.stack
+      details: error.message
     });
   }
 };
