@@ -1,5 +1,4 @@
-const crypto = require('crypto');
-const { createHash } = require('crypto');
+const ed25519 = require('ed25519');
 
 /**
  * 验证请求签名
@@ -58,11 +57,8 @@ const verifySignature = (req, res, next) => {
     console.log('seed长度:', seed.length);
 
     // 生成密钥对
-    const keyPair = crypto.generateKeyPairSync('ed25519', {
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      seed: Buffer.from(seed)
-    });
+    const keyPair = ed25519.MakeKeypair(Buffer.from(seed));
+    console.log('公钥:', keyPair.publicKey.toString('hex'));
 
     // 构建签名消息 - 按照文档要求使用 timestamp + body
     const body = JSON.stringify(req.body);
@@ -80,20 +76,17 @@ const verifySignature = (req, res, next) => {
     console.log('签名长度:', signatureBuffer.length);
 
     // 验证签名
-    const isValid = crypto.verify(
-      null,
+    const isValid = ed25519.Verify(
       Buffer.from(message),
-      keyPair.publicKey,
-      signatureBuffer
+      signatureBuffer,
+      keyPair.publicKey
     );
 
     console.log('签名验证结果:', isValid ? '通过' : '失败');
-    console.log('公钥:', keyPair.publicKey.toString('hex'));
 
     if (!isValid) {
       // 尝试重新计算签名进行对比
-      const calculatedSignature = crypto.sign(
-        null,
+      const calculatedSignature = ed25519.Sign(
         Buffer.from(message),
         keyPair.privateKey
       );
