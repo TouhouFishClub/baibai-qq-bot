@@ -1,4 +1,4 @@
-const ed25519 = require('ed25519');
+const { verifySignature } = require('../utils/signature');
 
 /**
  * 验证请求签名
@@ -6,7 +6,7 @@ const ed25519 = require('ed25519');
  * @param {Object} res - Express响应对象
  * @param {Function} next - Express next函数
  */
-const verifySignature = (req, res, next) => {
+const signatureMiddleware = (req, res, next) => {
   try {
     const signature = req.headers['x-signature-ed25519'];
     const timestamp = req.headers['x-signature-timestamp'];
@@ -36,29 +36,12 @@ const verifySignature = (req, res, next) => {
       });
     }
 
-    // 生成seed - 按照文档要求使用字符串重复
-    let seed = botSecret;
-    while (seed.length < 32) {
-      seed = seed.repeat(2);
-    }
-    seed = seed.slice(0, 32);
-
-    // 生成密钥对
-    const keyPair = ed25519.MakeKeypair(Buffer.from(seed));
-
-    // 构建签名消息 - 按照文档要求使用 timestamp + body
+    // 构建签名消息
     const body = JSON.stringify(req.body);
     const message = timestamp + body;
 
-    // 将签名从十六进制转换为Buffer
-    const signatureBuffer = Buffer.from(signature, 'hex');
-
     // 验证签名
-    const isValid = ed25519.Verify(
-      Buffer.from(message),
-      signatureBuffer,
-      keyPair.publicKey
-    );
+    const isValid = verifySignature(botSecret, message, signature);
 
     if (!isValid) {
       console.error('签名验证失败');
@@ -78,4 +61,4 @@ const verifySignature = (req, res, next) => {
   }
 };
 
-module.exports = verifySignature; 
+module.exports = signatureMiddleware; 

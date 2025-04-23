@@ -3,7 +3,7 @@
  * 处理QQ机器人的事件订阅与通知
  */
 
-const ed25519 = require('ed25519');
+const { generateSignature } = require('../utils/signature');
 const config = require('../src/config');
 
 // OpCode常量
@@ -86,11 +86,12 @@ async function handleValidation(payload, res) {
     const botSecret = config.qqBot.secret;
     
     // 生成签名
-    const signature = generateSignature(botSecret, eventTs, plainToken);
+    const message = eventTs + plainToken;
+    const signature = generateSignature(botSecret, message);
     
     console.log('生成的签名:', signature);
     
-    // 返回验证响应 - 注意格式必须完全符合QQ机器人要求
+    // 返回验证响应
     return res.json({
       plain_token: plainToken,
       signature: signature
@@ -98,7 +99,6 @@ async function handleValidation(payload, res) {
     
   } catch (error) {
     console.error('验证处理错误:', error);
-    // 即使错误也要返回一个有效的响应格式，避免验证失败
     return res.status(500).json({ 
       error: '验证处理失败',
       message: error.message
@@ -183,42 +183,4 @@ async function handleGroupAddRobot(eventData) {
   // 这里实现机器人被添加到群的处理逻辑
   console.log('处理机器人被添加到群:', eventData);
   // TODO: 实现群欢迎消息等逻辑
-}
-
-/**
- * 生成签名
- * 使用Ed25519算法，按照QQ机器人文档要求计算签名
- * @param {string} botSecret - 机器人密钥
- * @param {string} eventTs - 事件时间戳
- * @param {string} plainToken - 明文令牌
- * @returns {string} 十六进制格式的签名
- */
-function generateSignature(botSecret, eventTs, plainToken) {
-  try {
-    // 确保bot secret足够长度
-    let seed = botSecret;
-    while (seed.length < 32) {
-      seed = seed.repeat(2);
-    }
-    seed = seed.substring(0, 32);
-    
-    // 将密钥转换为Buffer
-    const seedBuffer = Buffer.from(seed);
-    
-    // 创建密钥对
-    const keyPair = ed25519.MakeKeypair(seedBuffer);
-    
-    // 构造消息 - 时间戳 + 明文令牌
-    const message = Buffer.from(eventTs + plainToken);
-    
-    // 使用私钥签名
-    const signature = ed25519.Sign(message, keyPair.privateKey);
-    
-    // 将签名转换为十六进制字符串
-    return signature.toString('hex');
-    
-  } catch (error) {
-    console.error('生成签名错误:', error);
-    throw error;
-  }
 } 
