@@ -47,7 +47,7 @@ const verifySignature = (req, res, next) => {
       });
     }
 
-    // 生成seed
+    // 生成seed - 按照文档要求使用字符串重复
     let seed = botSecret;
     while (seed.length < 32) {
       seed = seed.repeat(2);
@@ -64,7 +64,7 @@ const verifySignature = (req, res, next) => {
       seed: Buffer.from(seed)
     });
 
-    // 构建签名消息
+    // 构建签名消息 - 按照文档要求使用 timestamp + body
     const body = JSON.stringify(req.body);
     const message = timestamp + body;
 
