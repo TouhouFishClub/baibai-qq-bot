@@ -55,6 +55,7 @@ const verifySignature = (req, res, next) => {
     seed = seed.slice(0, 32);
 
     console.log('生成的seed:', seed);
+    console.log('seed长度:', seed.length);
 
     // 生成密钥对
     const keyPair = crypto.generateKeyPairSync('ed25519', {
@@ -73,20 +74,40 @@ const verifySignature = (req, res, next) => {
       message
     });
 
+    // 将签名从十六进制转换为Buffer
+    const signatureBuffer = Buffer.from(signature, 'hex');
+    console.log('签名Buffer:', signatureBuffer);
+    console.log('签名长度:', signatureBuffer.length);
+
     // 验证签名
     const isValid = crypto.verify(
       null,
       Buffer.from(message),
       keyPair.publicKey,
-      Buffer.from(signature, 'hex')
+      signatureBuffer
     );
 
     console.log('签名验证结果:', isValid ? '通过' : '失败');
+    console.log('公钥:', keyPair.publicKey.toString('hex'));
 
     if (!isValid) {
+      // 尝试重新计算签名进行对比
+      const calculatedSignature = crypto.sign(
+        null,
+        Buffer.from(message),
+        keyPair.privateKey
+      );
+      console.log('计算出的签名:', calculatedSignature.toString('hex'));
+      console.log('原始签名:', signature);
+
       return res.status(401).json({ 
         error: '签名验证失败',
-        details: '提供的签名与计算出的签名不匹配'
+        details: '提供的签名与计算出的签名不匹配',
+        debug: {
+          message,
+          calculatedSignature: calculatedSignature.toString('hex'),
+          providedSignature: signature
+        }
       });
     }
 
@@ -95,7 +116,8 @@ const verifySignature = (req, res, next) => {
     console.error('签名验证错误:', error);
     return res.status(500).json({ 
       error: '签名验证过程出错',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     });
   }
 };
