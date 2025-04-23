@@ -14,6 +14,7 @@ const verifySignature = (req, res, next) => {
     const botSecret = process.env.QQ_BOT_SECRET;
 
     if (!signature || !timestamp || !botSecret) {
+      console.log('缺少必要的签名信息')
       return res.status(401).json({ error: '缺少必要的签名信息' });
     }
 
@@ -44,6 +45,7 @@ const verifySignature = (req, res, next) => {
     );
 
     if (!isValid) {
+      console.log('签名验证失败')
       return res.status(401).json({ error: '签名验证失败' });
     }
 
