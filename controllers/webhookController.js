@@ -82,10 +82,13 @@ async function handleValidation(payload, res) {
     console.log('处理回调地址验证 - 令牌:', plainToken);
     console.log('处理回调地址验证 - 时间戳:', eventTs);
     
-    // 获取机器人密钥
-    const botSecret = config.qqBot.secret;
+    // 获取机器人密钥 - 使用环境变量
+    const botSecret = process.env.QQ_BOT_SECRET;
+    if (!botSecret) {
+      throw new Error('未配置QQ_BOT_SECRET环境变量');
+    }
     
-    // 生成签名
+    // 生成签名 - 使用 event_ts + plain_token 格式
     const message = eventTs + plainToken;
     const signature = generateSignature(botSecret, message);
     
