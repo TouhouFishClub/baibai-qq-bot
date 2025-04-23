@@ -41,6 +41,30 @@ app.use('/api', apiRoutes);
 // QQ Webhook 路由 - 使用签名验证中间件
 app.post('/qq/webhook', verifySignature, webhookController.handleWebhook);
 
+// 测试路由 - 输出请求参数
+app.all('/qq/test', (req, res) => {
+  console.log('=== 请求头信息 ===');
+  console.log('Headers:', req.headers);
+  console.log('\n=== 请求体信息 ===');
+  console.log('Body:', req.body);
+  console.log('\n=== 请求参数 ===');
+  console.log('Query:', req.query);
+  console.log('\n=== 完整请求信息 ===');
+  console.log('Request:', {
+    method: req.method,
+    url: req.url,
+    headers: req.headers,
+    body: req.body,
+    query: req.query
+  });
+  
+  res.json({
+    message: '请求信息已记录到控制台',
+    timestamp: new Date().toISOString(),
+    method: req.method
+  });
+});
+
 // 基础路由
 app.get('/', (req, res) => {
   res.json({ 
