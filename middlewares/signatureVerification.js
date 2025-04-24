@@ -10,8 +10,8 @@ const signatureMiddleware = (req, res, next) => {
   try {
     const signature = req.headers['x-signature-ed25519'];
     const timestamp = req.headers['x-signature-timestamp'];
-    const botSecret = process.env.QQ_BOT_SECRET;
-
+    const botSecret =
+    process.env.QQ_BOT_SECRET;
     if (!signature) {
       console.error('错误: 缺少 X-Signature-Ed25519 头');
       return res.status(401).json({ 
