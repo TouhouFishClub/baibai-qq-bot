@@ -30,6 +30,7 @@ exports.handleWebhook = async (req, res) => {
     
     console.log('收到QQ Webhook请求:', JSON.stringify(payload));
     console.log('Bot AppId:', botAppId);
+    console.log('======')
     
     if (!payload) {
       return res.status(400).json({ error: '无效的请求负载' });
@@ -125,23 +126,11 @@ async function handleDispatchEvent(payload, res) {
     
     // 根据不同的事件类型处理不同的逻辑
     switch (eventType) {
-      case 'AT_MESSAGE_CREATE':
-        // 处理@机器人消息
-        await handleAtMessage(eventData);
-        break;
-        
-      case 'DIRECT_MESSAGE_CREATE':
+      case 'GROUP_AT_MESSAGE_CREATE':
         // 处理私聊消息
-        await handleDirectMessage(eventData);
+        await handleGroupAtMessage(eventData);
         break;
-        
-      case 'GROUP_ADD_ROBOT':
-        // 处理机器人被添加到群
-        await handleGroupAddRobot(eventData);
-        break;
-        
-      // 可以添加更多事件类型的处理...
-        
+
       default:
         console.log(`未处理的事件类型: ${eventType}`);
     }
@@ -164,26 +153,8 @@ async function handleDispatchEvent(payload, res) {
 /**
  * 处理@机器人消息
  */
-async function handleAtMessage(eventData) {
-  // 这里实现@机器人消息的处理逻辑
-  console.log('处理@机器人消息:', eventData);
+async function handleGroupAtMessage(eventData) {
+  // 这里实现群中@机器人消息的处理逻辑
+  console.log('处理群中@机器人消息:', eventData);
   // TODO: 实现消息响应逻辑
 }
-
-/**
- * 处理私聊消息
- */
-async function handleDirectMessage(eventData) {
-  // 这里实现私聊消息的处理逻辑
-  console.log('处理私聊消息:', eventData);
-  // TODO: 实现消息响应逻辑
-}
-
-/**
- * 处理机器人被添加到群
- */
-async function handleGroupAddRobot(eventData) {
-  // 这里实现机器人被添加到群的处理逻辑
-  console.log('处理机器人被添加到群:', eventData);
-  // TODO: 实现群欢迎消息等逻辑
-} 
