@@ -163,18 +163,24 @@ async function sendMarkdownToGroup(groupOpenid, content, markdown, eventId = nul
 /**
  * 发送富媒体消息到群聊
  * @param {string} groupOpenid - 群聊的openid
- * @param {object} media - 富媒体对象
+ * @param {object} media - 富媒体对象，包含file_info字段
  * @param {string} [eventId] - 前置事件ID (可选)
  * @param {string} [msgId] - 前置消息ID (可选)
  * @returns {Promise<object>} 发送结果
  */
 async function sendMediaToGroup(groupOpenid, media, eventId = null, msgId = null) {
+  if (!media || !media.file_info) {
+    throw new Error('富媒体消息必须包含file_info字段');
+  }
+  
   return sendGroupMessage(
     groupOpenid,
     {
       content: ' ', // 富媒体消息需要内容，即使是空的
       msg_type: 7, // 富媒体消息
-      media
+      media: {
+        file_info: media.file_info
+      }
     },
     eventId,
     msgId

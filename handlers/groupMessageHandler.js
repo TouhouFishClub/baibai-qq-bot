@@ -117,20 +117,16 @@ async function sendReplyToGroup(responseData, groupOpenid, messageId) {
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
       const imageUrl = `${serverHost}/temp_images/${fileName}`;
       
-      // 构建富媒体消息
-      const media = {
-        file_info: responseData.path,
-        url: imageUrl,
-        title: "查询结果",
-        desc: responseData.message || "查询结果图片"
-      };
+      // 调用QQ API上传图片，获取file_info
+      const fileInfo = await uploadFileForGroup(groupOpenid, imageUrl, 1); // 1表示图片类型
       
-      // 发送富媒体消息
-      await sendMediaToGroup(groupOpenid, media, null, messageId);
-      
-      // 如果有文本消息，也发送文本
+      // 如果有文本消息，使用图文混合消息
       if (responseData.message) {
-        await sendTextToGroup(groupOpenid, responseData.message, null, messageId);
+        // 构建图文混合消息
+        await sendMediaWithText(groupOpenid, fileInfo, responseData.message, messageId);
+      } else {
+        // 只有图片，没有文本
+        await sendMediaToGroup(groupOpenid, { file_info: fileInfo }, null, messageId);
       }
       
     } else if (responseData.type === "text" && responseData.message) {
@@ -139,6 +135,149 @@ async function sendReplyToGroup(responseData, groupOpenid, messageId) {
     }
   } catch (error) {
     console.error('发送群聊回复失败:', error);
+  }
+}
+
+/**
+ * 上传文件获取file_info
+ * @param {string} groupOpenid - 群聊的openid
+ * @param {string} url - 文件URL
+ * @param {number} fileType - 文件类型（1:图片, 2:视频, 3:语音, 4:文件）
+ * @returns {Promise<string>} file_info
+ */
+async function uploadFileForGroup(groupOpenid, url, fileType) {
+  try {
+    const axios = require('axios');
+    const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
+    
+    // 获取访问令牌
+    const accessToken = await getAccessToken();
+    
+    // 构建上传文件请求
+    const response = await axios.post(
+      `${QQ_API_BASE_URL}/v2/groups/${groupOpenid}/files`,
+      {
+        file_type: fileType,
+        url: url,
+        srv_send_msg: false // 不直接发送，仅获取file_info
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+    
+    if (!response.data || !response.data.file_info) {
+      throw new Error('上传文件失败，未获取到file_info: ' + JSON.stringify(response.data));
+    }
+    
+    console.log('文件上传成功，获取到file_info:', response.data);
+    return response.data.file_info;
+    
+  } catch (error) {
+    console.error('上传文件失败:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 获取访问令牌
+ * @returns {Promise<string>} 访问令牌
+ */
+async function getAccessToken() {
+  const axios = require('axios');
+  const qs = require('querystring');
+  const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
+  
+  try {
+    const appId = process.env.QQ_BOT_APP_ID;
+    const appSecret = process.env.QQ_BOT_SECRET;
+    
+    if (!appId || !appSecret) {
+      throw new Error('未配置QQ_BOT_APP_ID或QQ_BOT_SECRET环境变量');
+    }
+    
+    // 获取访问令牌
+    const tokenResponse = await axios.post(
+      `${QQ_API_BASE_URL}/token`, 
+      qs.stringify({
+        grant_type: 'client_credentials',
+        client_id: appId,
+        client_secret: appSecret
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+    
+    if (!tokenResponse.data || !tokenResponse.data.access_token) {
+      throw new Error('获取访问令牌失败: ' + JSON.stringify(tokenResponse.data));
+    }
+    
+    return tokenResponse.data.access_token;
+  } catch (error) {
+    console.error('获取访问令牌错误:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 发送图文混合消息
+ * @param {string} groupOpenid - 群聊的openid 
+ * @param {string} fileInfo - 文件信息
+ * @param {string} text - 文本内容
+ * @param {string} messageId - 回复的消息ID
+ */
+async function sendMediaWithText(groupOpenid, fileInfo, text, messageId) {
+  try {
+    const axios = require('axios');
+    const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
+    
+    // 获取访问令牌
+    const accessToken = await getAccessToken();
+    
+    // 构建图文混合消息
+    const message = {
+      content: text, // 文本内容放在content中
+      msg_type: 7,   // 富媒体消息类型
+      media: {
+        file_info: fileInfo
+      },
+      msg_id: messageId
+    };
+    
+    // 发送消息请求
+    const response = await axios.post(
+      `${QQ_API_BASE_URL}/v2/groups/${groupOpenid}/messages`,
+      message,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+    
+    console.log('图文混合消息发送成功:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('发送图文混合消息失败:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
   }
 }
 
