@@ -22,17 +22,16 @@ async function getAccessToken() {
       throw new Error('未配置QQ_BOT_APP_ID或QQ_BOT_SECRET环境变量');
     }
     
-    // 获取访问令牌
+    // 获取访问令牌 - 使用正确的API地址
     const tokenResponse = await axios.post(
-      `${QQ_API_BASE_URL}/token`, 
-      qs.stringify({
-        grant_type: 'client_credentials',
-        client_id: appId,
-        client_secret: appSecret
-      }),
+      'https://bots.qq.com/app/getAppAccessToken',
+      {
+        appId: appId,
+        clientSecret: appSecret
+      },
       {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         }
       }
     );
@@ -41,6 +40,7 @@ async function getAccessToken() {
       throw new Error('获取访问令牌失败: ' + JSON.stringify(tokenResponse.data));
     }
     
+    console.log('成功获取访问令牌，有效期:', tokenResponse.data.expires_in, '秒');
     return tokenResponse.data.access_token;
   } catch (error) {
     console.error('获取访问令牌错误:', error.message);
@@ -100,7 +100,7 @@ async function sendGroupMessage(groupOpenid, message, eventId = null, msgId = nu
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `QQBot ${accessToken}`
         }
       }
     );
