@@ -28,6 +28,9 @@ if (config.security.enableCors) {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// 静态文件服务
+app.use(express.static(path.join(__dirname, '../public')));
+
 // 简单的请求日志中间件
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
