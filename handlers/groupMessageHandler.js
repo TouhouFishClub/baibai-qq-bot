@@ -6,6 +6,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { sendTextToGroup, sendMediaToGroup } = require('../services/messageService');
 
 /**
  * 处理@机器人消息
@@ -15,7 +16,7 @@ async function handleGroupAtMessage(eventData) {
     console.log('处理群中@机器人消息:', eventData);
     
     // 获取消息内容和相关信息
-    const { content, author, group_id, id: messageId } = eventData;
+    const { content, author, group_id, group_openid, id: messageId } = eventData;
     
     // 消息内容预处理（去除前后空格）
     const trimmedContent = content.trim();
@@ -65,12 +66,79 @@ async function handleGroupAtMessage(eventData) {
       console.log(`命令内容: ${actualContent}`);
       
       // 构建API请求
-      await callOpenAPI(commandPrefix, actualContent, author.id, group_id);
+      const apiResponse = await callOpenAPI(commandPrefix, actualContent, author.id, group_id);
+      
+      // 发送回复
+      if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
+        await sendReplyToGroup(apiResponse.data, group_openid, messageId);
+      }
     } else {
       console.log('收到非命令消息，忽略处理');
+      // 对非命令消息的回复
+      await sendTextToGroup(
+        group_openid, 
+        '我只能响应特定命令，可用的命令有：mbi, mbd, opt, meu, mbtv, mbcd',
+        null,
+        messageId
+      );
     }
   } catch (error) {
     console.error('处理群聊@消息失败:', error);
+  }
+}
+
+/**
+ * 发送回复到群聊
+ * @param {object} responseData - API响应数据
+ * @param {string} groupOpenid - 群聊openid
+ * @param {string} messageId - 用户消息ID
+ */
+async function sendReplyToGroup(responseData, groupOpenid, messageId) {
+  try {
+    if (responseData.type === "image" && responseData.base64 && responseData.path) {
+      // 处理图片消息
+      // 创建临时图片目录
+      const tempImageDir = path.join(__dirname, '../public/temp_images');
+      if (!fs.existsSync(tempImageDir)) {
+        fs.mkdirSync(tempImageDir, { recursive: true });
+      }
+      
+      // 获取文件名
+      const fileName = path.basename(responseData.path);
+      const imagePath = path.join(tempImageDir, fileName);
+      
+      // 解码Base64并保存图片
+      const imageBuffer = Buffer.from(responseData.base64, 'base64');
+      fs.writeFileSync(imagePath, imageBuffer);
+      
+      console.log(`图片已保存至: ${imagePath}`);
+      
+      // 获取绝对URL路径
+      const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
+      const imageUrl = `${serverHost}/temp_images/${fileName}`;
+      
+      // 构建富媒体消息
+      const media = {
+        file_info: responseData.path,
+        url: imageUrl,
+        title: "查询结果",
+        desc: responseData.message || "查询结果图片"
+      };
+      
+      // 发送富媒体消息
+      await sendMediaToGroup(groupOpenid, media, null, messageId);
+      
+      // 如果有文本消息，也发送文本
+      if (responseData.message) {
+        await sendTextToGroup(groupOpenid, responseData.message, null, messageId);
+      }
+      
+    } else if (responseData.type === "text" && responseData.message) {
+      // 处理文本消息
+      await sendTextToGroup(groupOpenid, responseData.message, null, messageId);
+    }
+  } catch (error) {
+    console.error('发送群聊回复失败:', error);
   }
 }
 
@@ -117,40 +185,6 @@ async function callOpenAPI(command, content, userId, groupId) {
     const response = await axios.get(`${API_BASE_URL}/openapi/${command}`, { params });
     
     console.log(`API响应结果:`, response.data);
-    
-    // 处理API响应
-    if (response.data && response.data.status === "ok" && response.data.data) {
-      const responseData = response.data.data;
-      
-      // 如果返回类型是图片，处理图片数据
-      if (responseData.type === "image" && responseData.base64 && responseData.path) {
-        // 创建临时图片目录
-        const tempImageDir = path.join(__dirname, '../public/temp_images');
-        if (!fs.existsSync(tempImageDir)) {
-          fs.mkdirSync(tempImageDir, { recursive: true });
-        }
-        
-        // 获取文件名
-        const fileName = path.basename(responseData.path);
-        const imagePath = path.join(tempImageDir, fileName);
-        
-        // 解码Base64并保存图片
-        const imageBuffer = Buffer.from(responseData.base64, 'base64');
-        fs.writeFileSync(imagePath, imageBuffer);
-        
-        console.log(`图片已保存至: ${imagePath}`);
-        
-        // 构建图片URL
-        const imageUrl = `/temp_images/${fileName}`;
-        
-        // 这里可以添加处理图片URL并发送消息到群的逻辑
-        console.log(`图片访问URL: ${imageUrl}`);
-        console.log(`图片消息内容: ${responseData.message}`);
-      } else if (responseData.type === "text" && responseData.message) {
-        // 处理文本消息
-        console.log(`文本消息内容: ${responseData.message}`);
-      }
-    }
     
     return response.data;
   } catch (error) {
