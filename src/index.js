@@ -9,7 +9,6 @@ require('dotenv').config();
 const verifySignature = require('../middlewares/signatureVerification');
 
 // 引入路由
-const apiRoutes = require('../routes/api');
 const webhookController = require('../controllers/webhookController');
 
 // 初始化Express应用
@@ -35,16 +34,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// 路由
-app.use('/api', apiRoutes);
-
 // QQ Webhook 路由 - 使用签名验证中间件
 app.post('/qq/webhook', verifySignature, webhookController.handleWebhook);
 
 // 基础路由
 app.get('/', (req, res) => {
   res.json({ 
-    message: `欢迎使用${config.qqBot.name} QQ机器人API服务`,
+    message: `欢迎使用${process.env.QQ_BOT_NAME} QQ机器人API服务`,
     environment: config.server.environment,
     version: '1.0.0'
   });
@@ -68,7 +64,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);
   console.log(`环境: ${config.server.environment}`);
-  console.log(`机器人名称: ${config.qqBot.name}`);
+  console.log(`机器人名称: ${process.env.QQ_BOT_NAME}`);
   console.log(`QQ Webhook 路径: http://localhost:${PORT}/qq/webhook`);
 });
 
