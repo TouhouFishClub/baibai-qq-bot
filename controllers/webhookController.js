@@ -232,6 +232,8 @@ async function callOpenAPI(command, content, userId, groupId) {
     }
     
     const axios = require('axios');
+    const fs = require('fs');
+    const path = require('path');
     
     // 从环境变量中获取API基础URL
     const API_BASE_URL = process.env.API_BASE_URL;
@@ -263,9 +265,39 @@ async function callOpenAPI(command, content, userId, groupId) {
     
     console.log(`API响应结果:`, response.data);
     
-    // 这里可以添加处理API响应并发送消息到群的逻辑
-    // 例如：
-    // await sendGroupReply(groupId, userId, response.data.message || JSON.stringify(response.data));
+    // 处理API响应
+    if (response.data && response.data.status === "ok" && response.data.data) {
+      const responseData = response.data.data;
+      
+      // 如果返回类型是图片，处理图片数据
+      if (responseData.type === "image" && responseData.base64 && responseData.path) {
+        // 创建临时图片目录
+        const tempImageDir = path.join(__dirname, '../public/temp_images');
+        if (!fs.existsSync(tempImageDir)) {
+          fs.mkdirSync(tempImageDir, { recursive: true });
+        }
+        
+        // 获取文件名
+        const fileName = path.basename(responseData.path);
+        const imagePath = path.join(tempImageDir, fileName);
+        
+        // 解码Base64并保存图片
+        const imageBuffer = Buffer.from(responseData.base64, 'base64');
+        fs.writeFileSync(imagePath, imageBuffer);
+        
+        console.log(`图片已保存至: ${imagePath}`);
+        
+        // 构建图片URL
+        const imageUrl = `/temp_images/${fileName}`;
+        
+        // 这里可以添加处理图片URL并发送消息到群的逻辑
+        console.log(`图片访问URL: ${imageUrl}`);
+        console.log(`图片消息内容: ${responseData.message}`);
+      } else if (responseData.type === "text" && responseData.message) {
+        // 处理文本消息
+        console.log(`文本消息内容: ${responseData.message}`);
+      }
+    }
     
     return response.data;
   } catch (error) {
