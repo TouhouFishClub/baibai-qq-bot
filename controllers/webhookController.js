@@ -154,7 +154,125 @@ async function handleDispatchEvent(payload, res) {
  * 处理@机器人消息
  */
 async function handleGroupAtMessage(eventData) {
-  // 这里实现群中@机器人消息的处理逻辑
-  console.log('处理群中@机器人消息:', eventData);
-  // TODO: 实现消息响应逻辑
+  try {
+    console.log('处理群中@机器人消息:', eventData);
+    
+    // 获取消息内容和相关信息
+    const { content, author, group_id, id: messageId } = eventData;
+    
+    // 消息内容预处理（去除前后空格）
+    const trimmedContent = content.trim();
+    
+    // 定义有效的命令前缀
+    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'mbtv', 'mbcd'];
+    
+    // 检查消息是否以有效前缀开头（不区分大小写）
+    let isValidCommand = false;
+    let commandPrefix = '';
+    let actualContent = '';
+    
+    // 处理以/开头的情况
+    if (trimmedContent.startsWith('/')) {
+      const withoutSlash = trimmedContent.substring(1).trim();
+      
+      for (const prefix of validPrefixes) {
+        const regexPattern = new RegExp(`^${prefix}`, 'i');
+        if (regexPattern.test(withoutSlash)) {
+          isValidCommand = true;
+          commandPrefix = prefix.toLowerCase();
+          
+          // 提取命令后的实际内容
+          const prefixLength = prefix.length;
+          actualContent = withoutSlash.substring(prefixLength).trim();
+          break;
+        }
+      }
+    } else {
+      // 处理直接以命令前缀开头的情况
+      for (const prefix of validPrefixes) {
+        const regexPattern = new RegExp(`^${prefix}`, 'i');
+        if (regexPattern.test(trimmedContent)) {
+          isValidCommand = true;
+          commandPrefix = prefix.toLowerCase();
+          
+          // 提取命令后的实际内容
+          const prefixLength = prefix.length;
+          actualContent = trimmedContent.substring(prefixLength).trim();
+          break;
+        }
+      }
+    }
+    
+    if (isValidCommand) {
+      console.log(`收到有效命令: ${commandPrefix}`);
+      console.log(`命令内容: ${actualContent}`);
+      
+      // 构建API请求
+      await callOpenAPI(commandPrefix, actualContent, author.id, group_id);
+    } else {
+      console.log('收到非命令消息，忽略处理');
+    }
+  } catch (error) {
+    console.error('处理群聊@消息失败:', error);
+  }
+}
+
+/**
+ * 调用外部OpenAPI接口
+ * @param {string} command - 命令类型 (mbi, mbd, opt等)
+ * @param {string} content - 实际内容
+ * @param {string} userId - 用户ID
+ * @param {string} groupId - 群组ID
+ */
+async function callOpenAPI(command, content, userId, groupId) {
+  try {
+    if (!content) {
+      console.log(`命令 ${command} 内容为空，不执行API调用`);
+      return;
+    }
+    
+    const axios = require('axios');
+    
+    // 从环境变量中获取API基础URL
+    const API_BASE_URL = process.env.API_BASE_URL;
+    
+    if (!API_BASE_URL) {
+      throw new Error('未配置API_BASE_URL环境变量');
+    }
+    
+    // 构建请求参数
+    const params = { content };
+    
+    // 根据不同命令添加不同的参数(暂不使用)
+    // switch (command) {
+    //   case 'opt':
+    //   case 'mbtv':
+    //   case 'mbcd':
+    //     params.from = userId;
+    //     break;
+    //   case 'meu':
+    //     params.from = userId;
+    //     params.groupid = groupId;
+    //     break;
+    // }
+    
+    // 发送请求
+    console.log(`发送API请求: ${API_BASE_URL}/openapi/${command}`, params);
+    
+    const response = await axios.get(`${API_BASE_URL}/openapi/${command}`, { params });
+    
+    console.log(`API响应结果:`, response.data);
+    
+    // 这里可以添加处理API响应并发送消息到群的逻辑
+    // 例如：
+    // await sendGroupReply(groupId, userId, response.data.message || JSON.stringify(response.data));
+    
+    return response.data;
+  } catch (error) {
+    console.error(`API请求失败 (${command}):`, error.message);
+    if (error.response) {
+      console.error('响应数据:', error.response.data);
+      console.error('响应状态:', error.response.status);
+    }
+  }
 }
