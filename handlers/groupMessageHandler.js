@@ -66,7 +66,7 @@ async function handleGroupAtMessage(eventData) {
       console.log(`命令内容: ${actualContent}`);
       
       // 构建API请求
-      const apiResponse = await callOpenAPI(commandPrefix, encodeURI(actualContent), author.id, group_id);
+      const apiResponse = await callOpenAPI(commandPrefix, actualContent, author.id, group_id);
       
       // 发送回复
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
@@ -300,8 +300,10 @@ async function callOpenAPI(command, content, userId, groupId) {
       throw new Error('未配置API_BASE_URL环境变量');
     }
     
-    // 构建请求参数
-    const params = { content };
+    // 构建请求参数 - 对content进行URL编码，避免特殊字符造成问题
+    const params = { 
+      content: encodeURIComponent(content)
+    };
     
     // 根据不同命令添加不同的参数
     switch (command) {
