@@ -41,9 +41,12 @@ async function handleDispatchEvent(payload, res) {
 
     console.log('=== 事件处理完成 ===\n\n\n\n\n\n\n');
     return res.json({
-      id: payload.id,
-      op: OP_CODE.HTTP_CALLBACK_ACK
+      status: 'success'
     });
+    // return res.json({
+    //   id: payload.id,
+    //   op: OP_CODE.HTTP_CALLBACK_ACK
+    // });
     
   } catch (error) {
     console.error('事件处理错误:', error);
