@@ -66,7 +66,7 @@ async function handleGroupAtMessage(eventData) {
       console.log(`命令内容: ${actualContent}`);
       
       // 构建API请求
-      const apiResponse = await callOpenAPI(commandPrefix, actualContent, author.id, group_id);
+      const apiResponse = await callOpenAPI(commandPrefix, encodeURI(actualContent), author.id, group_id);
       
       // 发送回复
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
