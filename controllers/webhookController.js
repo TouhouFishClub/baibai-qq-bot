@@ -36,19 +36,17 @@ exports.handleWebhook = async (req, res) => {
         
       default:
         console.log(`未处理的OpCode: ${payload.op}`);
-        // 对于其他未处理的op code，返回成功以避免QQ平台重试
+        // 对于其他未处理的op code，返回HTTP回调确认
         res.json({ 
-          code: 0, 
-          message: '成功接收，但未处理该类型事件'
+          op: OP_CODE.HTTP_CALLBACK_ACK 
         });
     }
     
   } catch (error) {
     console.error('Webhook处理错误:', error);
-    res.status(500).json({
-      code: 500,
-      message: '服务器内部错误',
-      error: error.message
+    // 确保在错误情况下也返回正确的回调确认格式
+    res.status(200).json({
+      op: OP_CODE.HTTP_CALLBACK_ACK
     });
   }
 };
