@@ -1,0 +1,20 @@
+{
+  "2F0073FD9A47773F56B28EA3E4CD7EB8": {
+    "group_id": "123456789",
+    "group_name": "测试群",
+    "description": "测试用QQ群",
+    "enabled": true
+  },
+  "ABCDEF1234567890ABCDEF1234567890": {
+    "group_id": "987654321",
+    "group_name": "开发群",
+    "description": "开发团队交流群",
+    "enabled": true
+  },
+  "FEDCBA0987654321FEDCBA0987654321": {
+    "group_id": "55667788",
+    "group_name": "产品群",
+    "description": "产品讨论群",
+    "enabled": false
+  }
+} 
