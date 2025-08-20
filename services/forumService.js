@@ -151,6 +151,71 @@ async function publishTextThread(channelId, title, content) {
 }
 
 /**
+ * 获取机器人所在的频道服务器列表
+ * @returns {Promise<object>} 频道服务器列表
+ */
+async function getGuildsList() {
+  try {
+    const accessToken = await getAccessToken();
+    
+    console.log('尝试获取机器人所在的频道服务器列表');
+    
+    const response = await axios.get(
+      `${QQ_CHANNEL_API_BASE_URL}/users/@me/guilds`,
+      {
+        headers: {
+          'Authorization': `QQBot ${accessToken}`
+        }
+      }
+    );
+    
+    console.log('频道服务器列表:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('获取频道服务器列表失败:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 获取指定频道服务器下的子频道列表
+ * @param {string} guildId - 频道服务器ID
+ * @returns {Promise<object>} 子频道列表
+ */
+async function getChannelsList(guildId) {
+  try {
+    const accessToken = await getAccessToken();
+    
+    console.log(`尝试获取频道服务器 ${guildId} 下的子频道列表`);
+    
+    const response = await axios.get(
+      `${QQ_CHANNEL_API_BASE_URL}/guilds/${guildId}/channels`,
+      {
+        headers: {
+          'Authorization': `QQBot ${accessToken}`
+        }
+      }
+    );
+    
+    console.log('子频道列表:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('获取子频道列表失败:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+/**
  * 获取频道信息 - 用于调试
  * @param {string} channelId - 频道ID
  * @returns {Promise<object>} 频道信息
@@ -188,5 +253,7 @@ module.exports = {
   publishExampleThread,
   publishMarkdownThread,
   publishTextThread,
-  getChannelInfo
+  getChannelInfo,
+  getGuildsList,
+  getChannelsList
 };

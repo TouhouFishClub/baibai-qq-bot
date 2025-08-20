@@ -10,8 +10,72 @@ const {
   publishThread,
   publishMarkdownThread,
   publishTextThread,
-  getChannelInfo
+  getChannelInfo,
+  getGuildsList,
+  getChannelsList
 } = require('../services/forumService');
+
+/**
+ * 获取机器人所在的频道服务器列表
+ * GET /put/guilds
+ */
+router.get('/guilds', async (req, res) => {
+  try {
+    console.log('收到获取频道服务器列表请求');
+    
+    const guildsList = await getGuildsList();
+    
+    res.json({
+      success: true,
+      message: '成功获取频道服务器列表',
+      data: guildsList
+    });
+    
+  } catch (error) {
+    console.error('获取频道服务器列表失败:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: '无法获取频道服务器列表，请检查机器人权限'
+    });
+  }
+});
+
+/**
+ * 获取指定频道服务器下的子频道列表
+ * GET /put/channels?guild_id=xxx
+ */
+router.get('/channels', async (req, res) => {
+  try {
+    const { guild_id } = req.query;
+    
+    if (!guild_id) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少guild_id参数',
+        message: '请在查询参数中提供guild_id，例如: /put/channels?guild_id=频道服务器ID'
+      });
+    }
+    
+    console.log(`收到获取子频道列表请求，频道服务器ID: ${guild_id}`);
+    
+    const channelsList = await getChannelsList(guild_id);
+    
+    res.json({
+      success: true,
+      message: '成功获取子频道列表',
+      data: channelsList
+    });
+    
+  } catch (error) {
+    console.error('获取子频道列表失败:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: '无法获取子频道列表，请检查频道服务器ID是否正确'
+    });
+  }
+});
 
 /**
  * 调试路由 - 获取频道信息
