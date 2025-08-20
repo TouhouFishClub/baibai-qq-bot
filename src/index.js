@@ -10,6 +10,7 @@ const verifySignature = require('../middlewares/signatureVerification');
 
 // 引入路由
 const webhookController = require('../controllers/webhookController');
+const forumRoutes = require('../routes/forumRoutes');
 
 // 初始化Express应用
 const app = express();
@@ -39,6 +40,9 @@ app.use((req, res, next) => {
 
 // QQ Webhook 路由 - 使用签名验证中间件
 app.post('/qq/webhook', verifySignature, webhookController.handleWebhook);
+
+// 论坛发帖路由
+app.use('/put', forumRoutes);
 
 // 基础路由
 app.get('/', (req, res) => {
