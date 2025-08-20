@@ -9,8 +9,46 @@ const {
   publishExampleThread,
   publishThread,
   publishMarkdownThread,
-  publishTextThread 
+  publishTextThread,
+  getChannelInfo
 } = require('../services/forumService');
+
+/**
+ * 调试路由 - 获取频道信息
+ * GET /put/debug?channel_id=xxx
+ */
+router.get('/debug', async (req, res) => {
+  try {
+    const { channel_id } = req.query;
+    
+    if (!channel_id) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少channel_id参数',
+        message: '请在查询参数中提供channel_id，例如: /put/debug?channel_id=频道ID'
+      });
+    }
+    
+    console.log(`收到调试请求，频道ID: ${channel_id}`);
+    
+    // 尝试获取频道信息
+    const channelInfo = await getChannelInfo(channel_id);
+    
+    res.json({
+      success: true,
+      message: '成功获取频道信息',
+      data: channelInfo
+    });
+    
+  } catch (error) {
+    console.error('获取频道信息失败:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: '无法获取频道信息，可能频道不存在或机器人无权限访问'
+    });
+  }
+});
 
 /**
  * 测试发帖功能 - 发送示例帖子
@@ -29,6 +67,14 @@ router.get('/test', async (req, res) => {
     }
     
     console.log(`收到测试发帖请求，频道ID: ${channel_id}`);
+    
+    // 先尝试获取频道信息进行验证
+    try {
+      const channelInfo = await getChannelInfo(channel_id);
+      console.log('频道验证成功，频道信息:', channelInfo);
+    } catch (debugError) {
+      console.warn('频道信息获取失败，但继续尝试发帖:', debugError.message);
+    }
     
     // 调用发帖服务发送示例帖子
     const result = await publishExampleThread(channel_id);

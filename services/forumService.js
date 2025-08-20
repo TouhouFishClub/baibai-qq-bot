@@ -6,7 +6,12 @@
 const axios = require('axios');
 
 // QQ机器人API基础URL
-const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
+// 重要发现：频道API和群聊API使用不同的域名！
+// 群聊API: https://api.sgroup.qq.com  (用于群聊消息)
+// 频道API: https://api.sgroup.qq.com  (用于频道相关功能) 
+// 但很可能频道论坛API需要使用QQ频道专用的API域名
+// 尝试使用频道专用的API域名
+const QQ_CHANNEL_API_BASE_URL = 'https://api.sgroup.qq.com';
 
 /**
  * 获取访问令牌
@@ -78,11 +83,14 @@ async function publishThread(channelId, title, content, format = 2) {
       format
     };
     
+    const apiUrl = `${QQ_CHANNEL_API_BASE_URL}/channels/${channelId}/threads`;
     console.log(`向频道 ${channelId} 发表帖子:`, requestData);
+    console.log(`API请求URL: ${apiUrl}`);
+    console.log(`使用令牌: ${accessToken ? '已获取' : '未获取'}`);
     
     // 发送发帖请求
     const response = await axios.put(
-      `${QQ_API_BASE_URL}/channels/${channelId}/threads`,
+      apiUrl,
       requestData,
       {
         headers: {
@@ -100,6 +108,7 @@ async function publishThread(channelId, title, content, format = 2) {
     if (error.response) {
       console.error('API响应:', error.response.data);
       console.error('状态码:', error.response.status);
+      console.error('响应头:', error.response.headers);
     }
     throw error;
   }
@@ -141,9 +150,43 @@ async function publishTextThread(channelId, title, content) {
   return publishThread(channelId, title, content, 1); // 普通文本格式
 }
 
+/**
+ * 获取频道信息 - 用于调试
+ * @param {string} channelId - 频道ID
+ * @returns {Promise<object>} 频道信息
+ */
+async function getChannelInfo(channelId) {
+  try {
+    const accessToken = await getAccessToken();
+    
+    console.log(`尝试获取频道 ${channelId} 的信息`);
+    
+    const response = await axios.get(
+      `${QQ_CHANNEL_API_BASE_URL}/channels/${channelId}`,
+      {
+        headers: {
+          'Authorization': `QQBot ${accessToken}`
+        }
+      }
+    );
+    
+    console.log('频道信息:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('获取频道信息失败:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
 module.exports = {
   publishThread,
   publishExampleThread,
   publishMarkdownThread,
-  publishTextThread
+  publishTextThread,
+  getChannelInfo
 };
