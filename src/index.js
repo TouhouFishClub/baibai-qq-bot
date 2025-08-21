@@ -11,6 +11,7 @@ const verifySignature = require('../middlewares/signatureVerification');
 // 引入路由
 const webhookController = require('../controllers/webhookController');
 const forumRoutes = require('../routes/forumRoutes');
+const autoPushRoutes = require('../routes/autoPushRoutes');
 
 // 初始化Express应用
 const app = express();
@@ -43,6 +44,9 @@ app.post('/qq/webhook', verifySignature, webhookController.handleWebhook);
 
 // 论坛发帖路由
 app.use('/put', forumRoutes);
+
+// 自动推送路由
+app.use('/auto-push', autoPushRoutes);
 
 // 管理页面路由
 app.get('/admin', (req, res) => {
