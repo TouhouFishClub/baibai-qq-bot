@@ -214,7 +214,7 @@ async function fetchPostDetail(detailUrl) {
     $content.find('a[id*="sina"], a[id*="qq"], a[id*="baidu"]').remove(); // 移除分享链接
     
     // 获取清理后的HTML内容
-    const htmlContent = $content.html();
+    const contentHtml = $content.html();
     
     // 获取纯文本内容（用于预览）
     const textContent = $content.text().trim();
@@ -223,7 +223,7 @@ async function fetchPostDetail(detailUrl) {
     
     return {
       title: title,
-      htmlContent: htmlContent,
+      htmlContent: contentHtml,
       textContent: textContent,
       url: detailUrl
     };
