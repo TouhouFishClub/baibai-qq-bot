@@ -83,6 +83,46 @@
             max-height: 400px;
             overflow-y: auto;
         }
+        
+        /* 自定义Quill工具栏按钮 */
+        .ql-insertTable:after {
+            content: '⊞';
+            font-size: 16px;
+        }
+        .ql-sourceCode:after {
+            content: '<>';
+            font-size: 12px;
+        }
+        
+        /* 源代码编辑器样式 */
+        .source-code-editor {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            min-height: 300px;
+            background-color: #f8f9fa;
+        }
+        
+        /* 表格插入模态框 */
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 20px);
+            gap: 2px;
+            padding: 10px;
+        }
+        .table-cell {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            background-color: #f8f9fa;
+        }
+        .table-cell:hover,
+        .table-cell.selected {
+            background-color: #007bff;
+        }
     </style>
 </head>
 <body>
@@ -168,6 +208,12 @@
                             <!-- Markdown编辑器 -->
                             <div id="markdownEditor" class="editor-content active">
                                 <label class="form-label">Markdown内容</label>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertMarkdownTable()">
+                                        <i class="fas fa-table me-1"></i>
+                                        插入表格
+                                    </button>
+                                </div>
                                 <textarea id="markdownTextarea"></textarea>
                             </div>
 
@@ -228,6 +274,63 @@
         </div>
     </div>
 
+    <!-- 表格插入模态框 -->
+    <div class="modal fade" id="tableModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">插入表格</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-2">请选择表格大小（点击单元格选择）：</p>
+                    <div class="table-grid" id="tableGrid"></div>
+                    <div class="mt-3">
+                        <span id="tableSize">1x1</span> 表格
+                    </div>
+                    <div class="mt-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="tableHeader">
+                            <label class="form-check-label" for="tableHeader">
+                                包含表头
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="insertTableBtn">插入表格</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 源代码编辑模态框 -->
+    <div class="modal fade" id="sourceCodeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">HTML源代码编辑</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="sourceCodeTextarea" class="form-label">HTML源代码：</label>
+                        <textarea class="form-control source-code-editor" id="sourceCodeTextarea" rows="15"></textarea>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <small>在这里您可以直接编辑HTML源代码，支持所有HTML标签。</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveSourceCodeBtn">保存并应用</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript库 -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
@@ -241,6 +344,7 @@
         let currentEditor = 'markdown';
         let quill = null;
         let easyMDE = null;
+        let selectedTableSize = { rows: 1, cols: 1 };
 
         // 初始化编辑器
         function initEditors() {
@@ -249,22 +353,29 @@
                 theme: 'snow',
                 placeholder: '请输入HTML内容...',
                 modules: {
-                    toolbar: [
-                        ['bold', 'italic', 'underline', 'strike'],
-                        ['blockquote', 'code-block'],
-                        [{ 'header': 1 }, { 'header': 2 }],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        [{ 'script': 'sub'}, { 'script': 'super' }],
-                        [{ 'indent': '-1'}, { 'indent': '+1' }],
-                        [{ 'direction': 'rtl' }],
-                        [{ 'size': ['small', false, 'large', 'huge'] }],
-                        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                        [{ 'color': [] }, { 'background': [] }],
-                        [{ 'font': [] }],
-                        [{ 'align': [] }],
-                        ['link', 'image'],
-                        ['clean']
-                    ]
+                    toolbar: {
+                        container: [
+                            ['bold', 'italic', 'underline', 'strike'],
+                            ['blockquote', 'code-block'],
+                            [{ 'header': 1 }, { 'header': 2 }],
+                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                            [{ 'script': 'sub'}, { 'script': 'super' }],
+                            [{ 'indent': '-1'}, { 'indent': '+1' }],
+                            [{ 'direction': 'rtl' }],
+                            [{ 'size': ['small', false, 'large', 'huge'] }],
+                            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                            [{ 'color': [] }, { 'background': [] }],
+                            [{ 'font': [] }],
+                            [{ 'align': [] }],
+                            ['link', 'image'],
+                            ['insertTable', 'sourceCode'],
+                            ['clean']
+                        ],
+                        handlers: {
+                            'insertTable': insertTable,
+                            'sourceCode': toggleSourceCode
+                        }
+                    }
                 }
             });
 
@@ -555,6 +666,189 @@
             }, 3000);
         }
 
+        // 插入表格处理函数
+        function insertTable() {
+            initTableGrid();
+            const tableModal = new bootstrap.Modal(document.getElementById('tableModal'));
+            tableModal.show();
+        }
+
+        // 源代码编辑处理函数
+        function toggleSourceCode() {
+            const sourceCodeTextarea = document.getElementById('sourceCodeTextarea');
+            sourceCodeTextarea.value = quill.root.innerHTML;
+            const sourceCodeModal = new bootstrap.Modal(document.getElementById('sourceCodeModal'));
+            sourceCodeModal.show();
+        }
+
+        // 初始化表格网格
+        function initTableGrid() {
+            const tableGrid = document.getElementById('tableGrid');
+            tableGrid.innerHTML = '';
+            
+            for (let row = 1; row <= 8; row++) {
+                for (let col = 1; col <= 10; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'table-cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    
+                    cell.addEventListener('mouseenter', function() {
+                        highlightTableCells(row, col);
+                        updateTableSize(row, col);
+                    });
+                    
+                    cell.addEventListener('click', function() {
+                        selectedTableSize = { rows: row, cols: col };
+                        updateTableSize(row, col);
+                    });
+                    
+                    tableGrid.appendChild(cell);
+                }
+            }
+        }
+
+        // 高亮表格单元格
+        function highlightTableCells(maxRow, maxCol) {
+            const cells = document.querySelectorAll('.table-cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                
+                if (row <= maxRow && col <= maxCol) {
+                    cell.classList.add('selected');
+                } else {
+                    cell.classList.remove('selected');
+                }
+            });
+        }
+
+        // 更新表格大小显示
+        function updateTableSize(rows, cols) {
+            document.getElementById('tableSize').textContent = `${rows}x${cols}`;
+            selectedTableSize = { rows, cols };
+        }
+
+        // 生成表格HTML
+        function generateTableHTML(rows, cols, hasHeader) {
+            let html = '<table class="table table-bordered">';
+            
+            for (let i = 0; i < rows; i++) {
+                html += '<tr>';
+                for (let j = 0; j < cols; j++) {
+                    if (i === 0 && hasHeader) {
+                        html += '<th>表头</th>';
+                    } else {
+                        html += '<td>内容</td>';
+                    }
+                }
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            return html;
+        }
+
+        // 插入表格到编辑器
+        function insertTableToEditor() {
+            const hasHeader = document.getElementById('tableHeader').checked;
+            const tableHTML = generateTableHTML(selectedTableSize.rows, selectedTableSize.cols, hasHeader);
+            
+            // 获取当前光标位置
+            const range = quill.getSelection();
+            const index = range ? range.index : quill.getLength();
+            
+            // 插入表格
+            quill.clipboard.dangerouslyPasteHTML(index, tableHTML);
+            
+            // 关闭模态框
+            const tableModal = bootstrap.Modal.getInstance(document.getElementById('tableModal'));
+            tableModal.hide();
+            
+            // 更新预览
+            updatePreview();
+        }
+
+        // 保存源代码到编辑器
+        function saveSourceCode() {
+            const sourceCode = document.getElementById('sourceCodeTextarea').value;
+            
+            try {
+                // 验证HTML是否有效
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = sourceCode;
+                
+                // 将源代码设置到编辑器
+                quill.root.innerHTML = sourceCode;
+                
+                // 关闭模态框
+                const sourceCodeModal = bootstrap.Modal.getInstance(document.getElementById('sourceCodeModal'));
+                sourceCodeModal.hide();
+                
+                // 更新预览
+                updatePreview();
+                
+                // 显示成功消息
+                showSuccess('源代码已成功应用到编辑器');
+                
+            } catch (error) {
+                showError('HTML源代码格式错误: ' + error.message);
+            }
+        }
+
+        // 插入Markdown表格
+        function insertMarkdownTable() {
+            const rows = prompt('请输入表格行数:', '3');
+            const cols = prompt('请输入表格列数:', '3');
+            
+            if (!rows || !cols || isNaN(rows) || isNaN(cols)) {
+                showError('请输入有效的行数和列数');
+                return;
+            }
+            
+            const numRows = parseInt(rows);
+            const numCols = parseInt(cols);
+            
+            if (numRows < 1 || numCols < 1 || numRows > 20 || numCols > 10) {
+                showError('行数应在1-20之间，列数应在1-10之间');
+                return;
+            }
+            
+            let markdownTable = '';
+            
+            // 生成表头
+            for (let j = 0; j < numCols; j++) {
+                markdownTable += '| 表头' + (j + 1) + ' ';
+            }
+            markdownTable += '|\n';
+            
+            // 生成分隔行
+            for (let j = 0; j < numCols; j++) {
+                markdownTable += '| --- ';
+            }
+            markdownTable += '|\n';
+            
+            // 生成数据行
+            for (let i = 1; i < numRows; i++) {
+                for (let j = 0; j < numCols; j++) {
+                    markdownTable += '| 内容' + i + '-' + (j + 1) + ' ';
+                }
+                markdownTable += '|\n';
+            }
+            
+            // 插入到编辑器
+            const cm = easyMDE.codemirror;
+            const cursor = cm.getCursor();
+            
+            // 在光标位置插入表格
+            cm.replaceRange('\n' + markdownTable + '\n', cursor);
+            
+            // 更新预览
+            updatePreview();
+            
+            showSuccess('Markdown表格已插入');
+        }
+
         // 全局模态框实例
         let loadingModal = null;
 
@@ -643,6 +937,10 @@
             document.getElementById('previewBtn').addEventListener('click', updatePreview);
             document.getElementById('clearBtn').addEventListener('click', clearContent);
             document.getElementById('postTitle').addEventListener('input', updatePublishButton);
+            
+            // 表格和源代码编辑相关事件
+            document.getElementById('insertTableBtn').addEventListener('click', insertTableToEditor);
+            document.getElementById('saveSourceCodeBtn').addEventListener('click', saveSourceCode);
             
             // 编辑器切换事件
             document.querySelectorAll('.editor-tab').forEach(tab => {
