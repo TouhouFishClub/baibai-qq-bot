@@ -17,7 +17,8 @@ const {
 
 const {
   getLatestPosts,
-  getTodayLatestPosts
+  getTodayLatestPosts,
+  fetchPostDetail
 } = require('../services/crawlerService');
 
 /**
@@ -51,12 +52,13 @@ router.get('/status', async (req, res) => {
  *   "checkInterval": 600000,
  *   "format": 3,
  *   "titlePrefix": "[洛奇资讯]",
- *   "sourceUrl": "https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html"
+ *   "sourceUrl": "https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html",
+ *   "sourceName": "洛奇官网"
  * }
  */
 router.post('/config', async (req, res) => {
   try {
-    const { channelId, checkInterval, format, titlePrefix, sourceUrl } = req.body;
+    const { channelId, checkInterval, format, titlePrefix, sourceUrl, sourceName } = req.body;
     
     if (!channelId) {
       return res.status(400).json({
@@ -66,12 +68,26 @@ router.post('/config', async (req, res) => {
       });
     }
     
+    // 验证URL格式
+    if (sourceUrl) {
+      try {
+        new URL(sourceUrl);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          error: 'URL格式无效',
+          message: '请提供有效的源URL'
+        });
+      }
+    }
+    
     const config = {
       channelId,
       checkInterval: checkInterval || 10 * 60 * 1000, // 默认10分钟
       format: format || 3, // 默认Markdown
       titlePrefix: titlePrefix || '[洛奇资讯]',
-      sourceUrl: sourceUrl || 'https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html'
+      sourceUrl: sourceUrl || 'https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html',
+      sourceName: sourceName || '洛奇官网'
     };
     
     setPushConfig(config);
@@ -188,24 +204,29 @@ router.post('/manual-check', async (req, res) => {
 
 /**
  * 测试抓取最新帖子
- * GET /auto-push/test-crawl
+ * GET /auto-push/test-crawl?url=xxx&limit=5
  */
 router.get('/test-crawl', async (req, res) => {
   try {
-    const { limit = 5 } = req.query;
+    const { limit = 5, url } = req.query;
+    const { getPushConfig } = require('../services/autoPushService');
     
-    console.log('测试抓取洛奇官网帖子...');
+    // 使用查询参数中的URL，或配置中的URL，或默认URL
+    const testUrl = url || getPushConfig().sourceUrl;
+    
+    console.log(`测试抓取网站帖子: ${testUrl}`);
     
     // 获取今日帖子和最新帖子
     const [todayPosts, latestPosts] = await Promise.all([
-      getTodayLatestPosts(),
-      getLatestPosts(undefined, parseInt(limit))
+      getTodayLatestPosts(testUrl),
+      getLatestPosts(testUrl, parseInt(limit))
     ]);
     
     res.json({
       success: true,
       message: '抓取测试完成',
       data: {
+        sourceUrl: testUrl,
         todayPosts: todayPosts,
         latestPosts: latestPosts,
         summary: {
@@ -269,6 +290,48 @@ router.get('/config', async (req, res) => {
       success: false,
       error: error.message,
       message: '获取推送配置失败'
+    });
+  }
+});
+
+/**
+ * 测试详情抓取
+ * GET /auto-push/test-detail?url=xxx
+ */
+router.get('/test-detail', async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少URL参数',
+        message: '请提供要测试的详情页URL'
+      });
+    }
+    
+    console.log(`测试详情抓取: ${url}`);
+    
+    const detail = await fetchPostDetail(url);
+    
+    res.json({
+      success: true,
+      message: '详情抓取测试完成',
+      data: {
+        url: url,
+        title: detail.title,
+        textPreview: detail.textContent ? detail.textContent.substring(0, 200) + '...' : '',
+        htmlLength: detail.htmlContent ? detail.htmlContent.length : 0,
+        hasContent: !!detail.htmlContent
+      }
+    });
+    
+  } catch (error) {
+    console.error('测试详情抓取失败:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: '详情抓取测试失败'
     });
   }
 });

@@ -7,13 +7,13 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 
 /**
- * 抓取洛奇官网的最新帖子
- * @param {string} url - 洛奇官网URL
+ * 抓取洛奇官网的帖子列表
+ * @param {string} url - 洛奇官网列表页URL
  * @returns {Promise<Array>} 帖子列表
  */
 async function fetchLuoqiPosts(url = 'https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html') {
   try {
-    console.log('开始抓取洛奇官网帖子...');
+    console.log(`开始抓取洛奇官网帖子: ${url}`);
     
     // 设置请求头，模拟浏览器访问
     const response = await axios.get(url, {
@@ -28,29 +28,53 @@ async function fetchLuoqiPosts(url = 'https://luoqi.tiancity.com/homepage/articl
       timeout: 30000
     });
     
-    // 使用cheerio解析HTML
     const $ = cheerio.load(response.data);
     const posts = [];
     
-    // 根据网站结构解析帖子信息
-    // 寻找包含帖子信息的元素
-    $('*').each((index, element) => {
-      const text = $(element).text().trim();
+    // 解析洛奇官网的帖子列表结构
+    // 格式: <ul class="newsList"><li><p><strong>【游戏】</strong><span>[2025-08-20]</span><a href="...">标题</a></p></li>...
+    $('.newsList li').each((index, element) => {
+      const $li = $(element);
+      const $p = $li.find('p');
+      const $category = $p.find('strong');
+      const $span = $p.find('span');
+      const $link = $p.find('a');
       
-      // 匹配日期格式 [2025-xx-xx] 的帖子
-      const dateMatch = text.match(/\[(\d{4}-\d{2}-\d{2})\](.+)/);
-      if (dateMatch) {
-        const date = dateMatch[1];
-        const title = dateMatch[2].trim();
+      if ($link.length > 0 && $span.length > 0) {
+        const title = $link.text().trim();
+        const href = $link.attr('href');
+        const dateText = $span.text().trim();
+        const category = $category.text().trim();
         
-        // 过滤掉空标题和重复项
-        if (title && !posts.find(p => p.title === title)) {
-          posts.push({
-            date: date,
-            title: title,
-            url: url,
-            id: generatePostId(date, title)
-          });
+        // 提取日期 [YYYY-MM-DD] 格式
+        const dateMatch = dateText.match(/\[(\d{4}-\d{2}-\d{2})\]/);
+        
+        if (title && href && dateMatch) {
+          const date = dateMatch[1];
+          
+          // 处理相对URL
+          let fullUrl = href;
+          if (href.startsWith('//')) {
+            fullUrl = `https:${href}`;
+          } else if (href.startsWith('/')) {
+            fullUrl = `https://luoqi.tiancity.com${href}`;
+          } else if (!href.startsWith('http')) {
+            // 相对路径
+            const baseUrl = new URL(url);
+            fullUrl = new URL(href, baseUrl.origin).toString();
+          }
+          
+          // 只处理洛奇官网的链接（排除17173等外链）
+          if (fullUrl.includes('luoqi.tiancity.com')) {
+            posts.push({
+              id: generatePostId(date, title),
+              title: title,
+              date: date,
+              url: fullUrl,
+              category: category,
+              isSticky: title.includes('置顶') || title.includes('公告')
+            });
+          }
         }
       }
     });
@@ -59,10 +83,66 @@ async function fetchLuoqiPosts(url = 'https://luoqi.tiancity.com/homepage/articl
     posts.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     console.log(`成功抓取到 ${posts.length} 篇帖子`);
+    console.log(`最新帖子: ${posts.slice(0, 3).map(p => `${p.title} (${p.date})`).join(', ')}`);
+    
     return posts;
     
   } catch (error) {
-    console.error('抓取洛奇官网失败:', error.message);
+    console.error(`抓取洛奇官网失败 (${url}):`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * 获取帖子详情内容
+ * @param {string} detailUrl - 详情页URL
+ * @returns {Promise<Object>} 详情内容
+ */
+async function fetchPostDetail(detailUrl) {
+  try {
+    console.log(`获取帖子详情: ${detailUrl}`);
+    
+    const response = await axios.get(detailUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 30000
+    });
+    
+    const $ = cheerio.load(response.data);
+    
+    // 获取标题：.newCon > .aur > h2
+    const title = $('.newCon .aur h2').text().trim();
+    
+    // 获取内容：#newscontent
+    const $content = $('#newscontent');
+    
+    // 移除分享按钮和其他无关元素
+    $content.find('.clearfix').remove(); // 移除分享相关的div
+    $content.find('a[id*="sina"], a[id*="qq"], a[id*="baidu"]').remove(); // 移除分享链接
+    
+    // 获取清理后的HTML内容
+    const htmlContent = $content.html();
+    
+    // 获取纯文本内容（用于预览）
+    const textContent = $content.text().trim();
+    
+    console.log(`成功获取详情，标题: ${title}`);
+    
+    return {
+      title: title,
+      htmlContent: htmlContent,
+      textContent: textContent,
+      url: detailUrl
+    };
+    
+  } catch (error) {
+    console.error(`获取详情失败 (${detailUrl}):`, error.message);
     throw error;
   }
 }
@@ -81,7 +161,7 @@ function generatePostId(date, title) {
 
 /**
  * 获取今日最新帖子
- * @param {string} url - 洛奇官网URL
+ * @param {string} url - 网站URL
  * @returns {Promise<Array>} 今日帖子列表
  */
 async function getTodayLatestPosts(url) {
@@ -103,7 +183,7 @@ async function getTodayLatestPosts(url) {
 
 /**
  * 获取最新的N篇帖子（不考虑置顶）
- * @param {string} url - 洛奇官网URL
+ * @param {string} url - 网站URL
  * @param {number} limit - 限制数量，默认5篇
  * @returns {Promise<Array>} 最新帖子列表
  */
@@ -111,14 +191,8 @@ async function getLatestPosts(url, limit = 5) {
   try {
     const posts = await fetchLuoqiPosts(url);
     
-    // 过滤掉置顶帖子（通常标题包含"置顶"、"公告"等关键词）
-    const filteredPosts = posts.filter(post => {
-      const title = post.title.toLowerCase();
-      return !title.includes('置顶') && 
-             !title.includes('公告') && 
-             !title.includes('维护') &&
-             !title.includes('停服');
-    });
+    // 过滤掉置顶帖子
+    const filteredPosts = posts.filter(post => !post.isSticky);
     
     // 返回最新的几篇
     const latestPosts = filteredPosts.slice(0, limit);
@@ -135,47 +209,86 @@ async function getLatestPosts(url, limit = 5) {
 /**
  * 格式化帖子内容为Markdown格式
  * @param {Object} post - 帖子对象
+ * @param {string} sourceName - 源站名称
+ * @param {Object} detail - 详情内容（可选）
  * @returns {string} Markdown格式的内容
  */
-function formatPostToMarkdown(post) {
-  return `# ${post.title}
+function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) {
+  let content = `# ${post.title}
 
 **发布日期**: ${post.date}
 
-**来源**: [洛奇官网](${post.url})
+**来源**: [${sourceName}](${post.url})
 
 ---
 
-> 这是从洛奇官网自动抓取的最新帖子信息。
-
-**帖子ID**: \`${post.id}\`
 `;
+
+  if (detail && detail.textContent) {
+    // 使用详情内容
+    content += `${detail.textContent.substring(0, 500)}...
+
+> 查看完整内容请访问：[原文链接](${post.url})
+
+`;
+  } else {
+    // 使用基本信息
+    content += `> 这是从${sourceName}自动抓取的最新帖子信息。
+
+`;
+  }
+
+  content += `**帖子ID**: \`${post.id}\``;
+  
+  return content;
 }
 
 /**
  * 格式化帖子内容为HTML格式
  * @param {Object} post - 帖子对象
+ * @param {string} sourceName - 源站名称
+ * @param {Object} detail - 详情内容（可选）
  * @returns {string} HTML格式的内容
  */
-function formatPostToHTML(post) {
-  return `<h1>${post.title}</h1>
+function formatPostToHTML(post, sourceName = '洛奇官网', detail = null) {
+  let content = `<h1>${post.title}</h1>
 
 <p><strong>发布日期</strong>: ${post.date}</p>
 
-<p><strong>来源</strong>: <a href="${post.url}">洛奇官网</a></p>
+<p><strong>来源</strong>: <a href="${post.url}">${sourceName}</a></p>
 
 <hr>
 
-<blockquote>
-<p>这是从洛奇官网自动抓取的最新帖子信息。</p>
+`;
+
+  if (detail && detail.htmlContent) {
+    // 使用详情HTML内容
+    content += `<div class="post-content">
+${detail.htmlContent}
+</div>
+
+<hr>
+
+<p><a href="${post.url}">查看原文</a></p>
+
+`;
+  } else {
+    // 使用基本信息
+    content += `<blockquote>
+<p>这是从${sourceName}自动抓取的最新帖子信息。</p>
 </blockquote>
 
-<p><strong>帖子ID</strong>: <code>${post.id}</code></p>
 `;
+  }
+
+  content += `<p><strong>帖子ID</strong>: <code>${post.id}</code></p>`;
+  
+  return content;
 }
 
 module.exports = {
   fetchLuoqiPosts,
+  fetchPostDetail,
   getTodayLatestPosts,
   getLatestPosts,
   formatPostToMarkdown,

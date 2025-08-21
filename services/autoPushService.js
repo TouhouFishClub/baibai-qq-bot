@@ -8,7 +8,8 @@ const {
   getTodayLatestPosts, 
   formatPostToMarkdown, 
   formatPostToHTML,
-  generatePostId
+  generatePostId,
+  fetchPostDetail
 } = require('./crawlerService');
 
 const { 
@@ -24,9 +25,10 @@ let pushConfig = {
   enabled: false,
   channelId: null,
   checkInterval: 10 * 60 * 1000, // 10分钟检查一次
-  sourceUrl: 'https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html',
+  sourceUrl: 'https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html', // 默认洛奇官网
   format: 3, // 默认使用Markdown格式
-  titlePrefix: '[洛奇资讯]'
+  titlePrefix: '[洛奇资讯]',
+  sourceName: '洛奇官网' // 源站名称
 };
 
 // 定时器ID
@@ -80,14 +82,25 @@ async function pushPostToChannel(post, channelId) {
       return { success: false, reason: 'already_exists' };
     }
     
+    // 获取帖子详情内容
+    let detail = null;
+    try {
+      if (post.url && post.url.includes('luoqi.tiancity.com')) {
+        console.log(`获取帖子详情: ${post.title}`);
+        detail = await fetchPostDetail(post.url);
+      }
+    } catch (error) {
+      console.warn(`获取详情失败，使用基本信息: ${error.message}`);
+    }
+    
     // 格式化帖子内容
     const title = `${pushConfig.titlePrefix} ${post.title}`;
     let content;
     
     if (pushConfig.format === 3) {
-      content = formatPostToMarkdown(post);
+      content = formatPostToMarkdown(post, pushConfig.sourceName, detail);
     } else {
-      content = formatPostToHTML(post);
+      content = formatPostToHTML(post, pushConfig.sourceName, detail);
     }
     
     console.log(`准备推送帖子: "${title}" 到频道 ${channelId}`);

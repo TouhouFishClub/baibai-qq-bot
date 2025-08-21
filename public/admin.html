@@ -233,8 +233,6 @@
                                                     <label for="pushInterval" class="form-label">检查间隔（分钟）</label>
                                                     <input type="number" class="form-control" id="pushInterval" value="10" min="1" max="1440">
                                                 </div>
-                                            </div>
-                                            <div class="col-md-6">
                                                 <div class="mb-3">
                                                     <label for="pushFormat" class="form-label">推送格式</label>
                                                     <select class="form-select" id="pushFormat">
@@ -242,9 +240,31 @@
                                                         <option value="2">HTML</option>
                                                     </select>
                                                 </div>
+                                            </div>
+                                            <div class="col-md-6">
                                                 <div class="mb-3">
                                                     <label for="titlePrefix" class="form-label">标题前缀</label>
                                                     <input type="text" class="form-control" id="titlePrefix" value="[洛奇资讯]">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="sourceName" class="form-label">源站名称</label>
+                                                    <input type="text" class="form-control" id="sourceName" value="洛奇官网" placeholder="例如：洛奇官网">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="sourceUrl" class="form-label">源URL</label>
+                                                    <div class="input-group">
+                                                        <input type="url" class="form-control" id="sourceUrl" placeholder="https://example.com/news" value="https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html">
+                                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                            预设
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li><a class="dropdown-item" href="#" onclick="setPresetUrl('https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html', '洛奇官网', '[洛奇资讯]')">洛奇官网 - 游戏新闻</a></li>
+                                                            <li><a class="dropdown-item" href="#" onclick="setPresetUrl('https://luoqi.tiancity.com/homepage/article/Class_244_Time_1.html', '洛奇官网', '[洛奇活动]')">洛奇官网 - 活动公告</a></li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li><a class="dropdown-item text-muted" href="#">更多预设待添加...</a></li>
+                                                        </ul>
+                                                    </div>
+                                                    <div class="form-text">支持任何包含日期格式 [YYYY-MM-DD] 的新闻列表页面</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -263,6 +283,10 @@
                                                 <button type="button" class="btn btn-outline-primary me-2" id="testCrawlBtn">
                                                     <i class="fas fa-spider me-1"></i>
                                                     测试抓取
+                                                </button>
+                                                <button type="button" class="btn btn-outline-info me-2" id="testDetailBtn">
+                                                    <i class="fas fa-file-alt me-1"></i>
+                                                    测试详情
                                                 </button>
                                                 <button type="button" class="btn btn-outline-secondary" id="clearRecordsBtn">
                                                     <i class="fas fa-trash me-1"></i>
@@ -745,6 +769,8 @@
                     document.getElementById('pushInterval').value = Math.round(config.checkInterval / 60000);
                     document.getElementById('pushFormat').value = config.format || 3;
                     document.getElementById('titlePrefix').value = config.titlePrefix || '[洛奇资讯]';
+                    document.getElementById('sourceName').value = config.sourceName || '洛奇官网';
+                    document.getElementById('sourceUrl').value = config.sourceUrl || 'https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html';
                 }
             } catch (error) {
                 addPushLog('获取推送配置失败: ' + error.message, 'error');
@@ -758,11 +784,26 @@
                     channelId: document.getElementById('pushChannelId').value.trim(),
                     checkInterval: parseInt(document.getElementById('pushInterval').value) * 60000,
                     format: parseInt(document.getElementById('pushFormat').value),
-                    titlePrefix: document.getElementById('titlePrefix').value.trim()
+                    titlePrefix: document.getElementById('titlePrefix').value.trim(),
+                    sourceName: document.getElementById('sourceName').value.trim(),
+                    sourceUrl: document.getElementById('sourceUrl').value.trim()
                 };
                 
                 if (!config.channelId) {
                     addPushLog('请输入频道ID', 'error');
+                    return;
+                }
+                
+                if (!config.sourceUrl) {
+                    addPushLog('请输入源URL', 'error');
+                    return;
+                }
+                
+                // 验证URL格式
+                try {
+                    new URL(config.sourceUrl);
+                } catch (e) {
+                    addPushLog('源URL格式无效', 'error');
                     return;
                 }
                 
@@ -866,14 +907,23 @@
         async function testCrawl() {
             try {
                 showLoading();
-                addPushLog('开始测试抓取洛奇官网...', 'info');
                 
-                const response = await fetch('/auto-push/test-crawl');
+                // 获取当前配置的URL或使用输入框中的URL
+                const testUrl = document.getElementById('sourceUrl').value.trim();
+                if (!testUrl) {
+                    addPushLog('请先配置源URL', 'error');
+                    return;
+                }
+                
+                addPushLog(`开始测试抓取: ${testUrl}`, 'info');
+                
+                const response = await fetch(`/auto-push/test-crawl?url=${encodeURIComponent(testUrl)}`);
                 const result = await response.json();
                 
                 if (result.success) {
                     const data = result.data;
                     addPushLog(`抓取成功: 今日 ${data.summary.todayCount} 篇，最新 ${data.summary.latestCount} 篇`, 'success');
+                    addPushLog(`源地址: ${data.sourceUrl}`, 'info');
                     
                     // 显示今日帖子
                     if (data.todayPosts.length > 0) {
@@ -889,6 +939,10 @@
                         data.latestPosts.slice(0, 3).forEach(post => {
                             addPushLog(`  • ${post.title} (${post.date})`, 'info');
                         });
+                    }
+                    
+                    if (data.todayPosts.length === 0 && data.latestPosts.length === 0) {
+                        addPushLog('未找到任何帖子，请检查URL是否正确', 'error');
                     }
                 } else {
                     addPushLog('抓取测试失败: ' + result.message, 'error');
@@ -918,6 +972,71 @@
                 }
             } catch (error) {
                 addPushLog('清除记录失败: ' + error.message, 'error');
+            }
+        }
+
+        // 设置预设URL
+        function setPresetUrl(url, sourceName, titlePrefix) {
+            document.getElementById('sourceUrl').value = url;
+            document.getElementById('sourceName').value = sourceName;
+            document.getElementById('titlePrefix').value = titlePrefix;
+            
+            addPushLog(`已设置预设配置: ${sourceName}`, 'info');
+            addPushLog(`URL: ${url}`, 'info');
+        }
+
+        // 测试详情抓取
+        async function testDetail() {
+            try {
+                showLoading();
+                
+                // 先进行抓取测试获取帖子URL
+                const testUrl = document.getElementById('sourceUrl').value.trim();
+                if (!testUrl) {
+                    addPushLog('请先配置源URL', 'error');
+                    return;
+                }
+                
+                addPushLog(`开始测试详情抓取...`, 'info');
+                
+                // 先获取列表
+                const crawlResponse = await fetch(`/auto-push/test-crawl?url=${encodeURIComponent(testUrl)}&limit=1`);
+                const crawlResult = await crawlResponse.json();
+                
+                if (!crawlResult.success) {
+                    addPushLog('获取帖子列表失败: ' + crawlResult.message, 'error');
+                    return;
+                }
+                
+                const posts = crawlResult.data.latestPosts;
+                if (posts.length === 0) {
+                    addPushLog('没有找到可测试的帖子', 'error');
+                    return;
+                }
+                
+                const testPost = posts[0];
+                addPushLog(`测试帖子: ${testPost.title}`, 'info');
+                addPushLog(`详情URL: ${testPost.url}`, 'info');
+                
+                // 测试详情抓取
+                const detailResponse = await fetch(`/auto-push/test-detail?url=${encodeURIComponent(testPost.url)}`);
+                const detailResult = await detailResponse.json();
+                
+                if (detailResult.success) {
+                    const data = detailResult.data;
+                    addPushLog(`详情抓取成功!`, 'success');
+                    addPushLog(`标题: ${data.title}`, 'info');
+                    addPushLog(`HTML内容长度: ${data.htmlLength} 字符`, 'info');
+                    addPushLog(`文本预览: ${data.textPreview}`, 'info');
+                    addPushLog(`有内容: ${data.hasContent ? '是' : '否'}`, data.hasContent ? 'success' : 'error');
+                } else {
+                    addPushLog('详情抓取失败: ' + detailResult.message, 'error');
+                }
+                
+            } catch (error) {
+                addPushLog('详情测试失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
             }
         }
 
@@ -1018,6 +1137,7 @@
             document.getElementById('manualCheckBtn').addEventListener('click', manualCheck);
             document.getElementById('savePushConfigBtn').addEventListener('click', savePushConfig);
             document.getElementById('testCrawlBtn').addEventListener('click', testCrawl);
+            document.getElementById('testDetailBtn').addEventListener('click', testDetail);
             document.getElementById('clearRecordsBtn').addEventListener('click', clearPushRecords);
 
             
