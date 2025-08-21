@@ -12,8 +12,36 @@ const {
   publishTextThread,
   getChannelInfo,
   getGuildsList,
-  getChannelsList
+  getChannelsList,
+  getAccessToken
 } = require('../services/forumService');
+
+/**
+ * API状态检查
+ * GET /put/status
+ */
+router.get('/status', async (req, res) => {
+  try {
+    // 尝试获取访问令牌来检查API状态
+    const token = await getAccessToken();
+    
+    res.json({
+      success: true,
+      message: 'API服务正常',
+      data: {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        token_status: token ? 'valid' : 'invalid'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'API服务异常',
+      error: error.message
+    });
+  }
+});
 
 /**
  * 获取机器人所在的频道服务器列表
@@ -114,53 +142,10 @@ router.get('/debug', async (req, res) => {
   }
 });
 
-/**
- * 测试发帖功能 - 发送示例帖子
- * GET /put/test?channel_id=xxx
- */
-router.get('/test', async (req, res) => {
-  try {
-    const { channel_id } = req.query;
-    
-    if (!channel_id) {
-      return res.status(400).json({
-        success: false,
-        error: '缺少channel_id参数',
-        message: '请在查询参数中提供channel_id，例如: /put/test?channel_id=频道ID'
-      });
-    }
-    
-    console.log(`收到测试发帖请求，频道ID: ${channel_id}`);
-    
-    // 先尝试获取频道信息进行验证
-    try {
-      const channelInfo = await getChannelInfo(channel_id);
-      console.log('频道验证成功，频道信息:', channelInfo);
-    } catch (debugError) {
-      console.warn('频道信息获取失败，但继续尝试发帖:', debugError.message);
-    }
-    
-    // 调用发帖服务发送示例帖子
-    const result = await publishExampleThread(channel_id);
-    
-    res.json({
-      success: true,
-      message: '示例帖子发送成功',
-      data: result
-    });
-    
-  } catch (error) {
-    console.error('测试发帖失败:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: '发帖失败，请检查频道ID是否正确以及机器人是否有发帖权限'
-    });
-  }
-});
+
 
 /**
- * 自定义发帖功能
+ * 自定义发帖功能 - 支持管理页面
  * POST /put/custom
  * Body: {
  *   "channel_id": "频道ID",
@@ -173,6 +158,7 @@ router.post('/custom', async (req, res) => {
   try {
     const { channel_id, title, content, format = 2 } = req.body;
     
+    // 参数验证
     if (!channel_id || !title || !content) {
       return res.status(400).json({
         success: false,
@@ -180,24 +166,67 @@ router.post('/custom', async (req, res) => {
         message: '请提供channel_id、title和content参数'
       });
     }
+
+    // 格式验证
+    if (![1, 2, 3, 4].includes(format)) {
+      return res.status(400).json({
+        success: false,
+        error: '格式参数无效',
+        message: 'format参数必须是1-4之间的数字'
+      });
+    }
+
+    // 内容长度验证
+    if (title.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: '标题过长',
+        message: '标题长度不能超过100个字符'
+      });
+    }
+
+    if (content.length > 20000) {
+      return res.status(400).json({
+        success: false,
+        error: '内容过长',
+        message: '内容长度不能超过20000个字符'
+      });
+    }
     
-    console.log(`收到自定义发帖请求，频道ID: ${channel_id}, 标题: ${title}`);
+    console.log(`收到发帖请求 - 频道: ${channel_id}, 标题: "${title}", 格式: ${format}`);
     
     // 调用发帖服务
     const result = await publishThread(channel_id, title, content, format);
     
     res.json({
       success: true,
-      message: '帖子发送成功',
-      data: result
+      message: '帖子发布成功',
+      data: {
+        task_id: result.task_id,
+        create_time: result.create_time,
+        channel_id: channel_id,
+        title: title,
+        format: format
+      }
     });
     
   } catch (error) {
-    console.error('自定义发帖失败:', error.message);
+    console.error('发帖失败:', error.message);
+    
+    // 根据错误类型返回不同的错误信息
+    let errorMessage = '发帖失败，请检查参数是否正确';
+    if (error.message.includes('频道不存在')) {
+      errorMessage = '指定的频道不存在或机器人无权限访问';
+    } else if (error.message.includes('权限')) {
+      errorMessage = '机器人在该频道没有发帖权限';
+    } else if (error.message.includes('token') || error.message.includes('认证')) {
+      errorMessage = '机器人认证失败，请检查配置';
+    }
+    
     res.status(500).json({
       success: false,
       error: error.message,
-      message: '发帖失败，请检查参数是否正确以及机器人是否有发帖权限'
+      message: errorMessage
     });
   }
 });

@@ -44,12 +44,18 @@ app.post('/qq/webhook', verifySignature, webhookController.handleWebhook);
 // 论坛发帖路由
 app.use('/put', forumRoutes);
 
+// 管理页面路由
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin.html'));
+});
+
 // 基础路由
 app.get('/', (req, res) => {
   res.json({ 
     message: `欢迎使用${process.env.QQ_BOT_NAME} QQ机器人API服务`,
     environment: config.server.environment,
-    version: '1.0.0'
+    version: '1.0.0',
+    admin_url: `http://localhost:${PORT}/admin`
   });
 });
 

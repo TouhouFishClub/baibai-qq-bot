@@ -255,5 +255,6 @@ module.exports = {
   publishTextThread,
   getChannelInfo,
   getGuildsList,
-  getChannelsList
+  getChannelsList,
+  getAccessToken
 };
