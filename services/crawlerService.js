@@ -25,10 +25,59 @@ async function fetchLuoqiPosts(url = 'https://luoqi.tiancity.com/homepage/articl
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1'
       },
-      timeout: 30000
+      timeout: 30000,
+      responseType: 'arraybuffer' // 获取原始字节数据
     });
     
-    const $ = cheerio.load(response.data);
+    // 检测并处理编码
+    let htmlContent;
+    const buffer = Buffer.from(response.data);
+    
+    // 尝试从Content-Type头获取编码
+    const contentType = response.headers['content-type'];
+    let encoding = 'utf8'; // 默认编码
+    
+    if (contentType) {
+      const charsetMatch = contentType.match(/charset=([^;]+)/i);
+      if (charsetMatch) {
+        encoding = charsetMatch[1].toLowerCase();
+        console.log(`检测到页面编码: ${encoding}`);
+      }
+    }
+    
+    // 尝试从HTML meta标签获取编码
+    const htmlStart = buffer.toString('utf8', 0, Math.min(1000, buffer.length));
+    const metaCharsetMatch = htmlStart.match(/<meta[^>]+charset[^>]*content[^>]*=["']?([^"'>;]+)/i) ||
+                            htmlStart.match(/<meta[^>]+content[^>]*charset[^>]*=["']?([^"'>;]+)/i) ||
+                            htmlStart.match(/<meta[^>]+charset[^>]*=["']?([^"'>;]+)/i);
+    
+    if (metaCharsetMatch) {
+      const metaEncoding = metaCharsetMatch[1].toLowerCase();
+      console.log(`HTML meta标签编码: ${metaEncoding}`);
+      if (metaEncoding.includes('gb') || metaEncoding.includes('gbk') || metaEncoding.includes('gb2312')) {
+        encoding = 'gbk';
+      } else if (metaEncoding.includes('utf-8') || metaEncoding.includes('utf8')) {
+        encoding = 'utf8';
+      }
+    }
+    
+    // 根据检测到的编码转换文本
+    if (encoding === 'gbk' || encoding === 'gb2312') {
+      // 需要安装iconv-lite来处理GBK编码
+      try {
+        const iconv = require('iconv-lite');
+        htmlContent = iconv.decode(buffer, 'gbk');
+        console.log('使用GBK编码解析页面');
+      } catch (err) {
+        console.warn('iconv-lite未安装，使用UTF-8解析');
+        htmlContent = buffer.toString('utf8');
+      }
+    } else {
+      htmlContent = buffer.toString('utf8');
+      console.log('使用UTF-8编码解析页面');
+    }
+    
+    const $ = cheerio.load(htmlContent);
     const posts = [];
     
     // 解析洛奇官网的帖子列表结构
@@ -111,10 +160,48 @@ async function fetchPostDetail(detailUrl) {
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1'
       },
-      timeout: 30000
+      timeout: 30000,
+      responseType: 'arraybuffer' // 获取原始字节数据
     });
     
-    const $ = cheerio.load(response.data);
+    // 检测并处理编码（与列表页相同的逻辑）
+    let detailHtmlContent;
+    const buffer = Buffer.from(response.data);
+    
+    const contentType = response.headers['content-type'];
+    let encoding = 'utf8';
+    
+    if (contentType) {
+      const charsetMatch = contentType.match(/charset=([^;]+)/i);
+      if (charsetMatch) {
+        encoding = charsetMatch[1].toLowerCase();
+      }
+    }
+    
+    const htmlStart = buffer.toString('utf8', 0, Math.min(1000, buffer.length));
+    const metaCharsetMatch = htmlStart.match(/<meta[^>]+charset[^>]*content[^>]*=["']?([^"'>;]+)/i) ||
+                            htmlStart.match(/<meta[^>]+content[^>]*charset[^>]*=["']?([^"'>;]+)/i) ||
+                            htmlStart.match(/<meta[^>]+charset[^>]*=["']?([^"'>;]+)/i);
+    
+    if (metaCharsetMatch) {
+      const metaEncoding = metaCharsetMatch[1].toLowerCase();
+      if (metaEncoding.includes('gb') || metaEncoding.includes('gbk') || metaEncoding.includes('gb2312')) {
+        encoding = 'gbk';
+      }
+    }
+    
+    if (encoding === 'gbk' || encoding === 'gb2312') {
+      try {
+        const iconv = require('iconv-lite');
+        detailHtmlContent = iconv.decode(buffer, 'gbk');
+      } catch (err) {
+        detailHtmlContent = buffer.toString('utf8');
+      }
+    } else {
+      detailHtmlContent = buffer.toString('utf8');
+    }
+    
+    const $ = cheerio.load(detailHtmlContent);
     
     // 获取标题：.newCon > .aur > h2
     const title = $('.newCon .aur h2').text().trim();
