@@ -3,6 +3,9 @@
  * 负责定时检查并推送网站的最新帖子到指定频道
  */
 
+const fs = require('fs').promises;
+const path = require('path');
+
 const { 
   getLatestPosts, 
   getTodayLatestPosts, 
@@ -16,6 +19,11 @@ const {
   publishThread,
   getChannelsList 
 } = require('./forumService');
+
+// 数据文件路径
+const DATA_DIR = path.join(__dirname, '../data');
+const CONFIGS_FILE = path.join(DATA_DIR, 'push_configs.json');
+const RECORDS_FILE = path.join(DATA_DIR, 'pushed_records.json');
 
 // 存储已推送的帖子ID（按配置ID分组）
 let pushedPostIds = new Map(); // configId -> Set<postId>
@@ -38,6 +46,111 @@ const defaultConfig = {
 };
 
 /**
+ * 确保数据目录存在
+ */
+async function ensureDataDir() {
+  try {
+    await fs.access(DATA_DIR);
+  } catch {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    console.log('创建数据目录:', DATA_DIR);
+  }
+}
+
+/**
+ * 保存配置到文件
+ */
+async function saveConfigsToFile() {
+  try {
+    await ensureDataDir();
+    const configsData = pushConfigs.map(config => ({
+      ...config,
+      // 不保存enabled状态，重启后默认为false
+      enabled: false
+    }));
+    await fs.writeFile(CONFIGS_FILE, JSON.stringify(configsData, null, 2));
+    console.log('配置已保存到文件');
+  } catch (error) {
+    console.error('保存配置到文件失败:', error.message);
+  }
+}
+
+/**
+ * 从文件加载配置
+ */
+async function loadConfigsFromFile() {
+  try {
+    await ensureDataDir();
+    const data = await fs.readFile(CONFIGS_FILE, 'utf8');
+    const configs = JSON.parse(data);
+    pushConfigs = configs;
+    console.log(`从文件加载了 ${configs.length} 个配置`);
+    
+    // 为每个配置初始化推送记录
+    configs.forEach(config => {
+      if (!pushedPostIds.has(config.id)) {
+        pushedPostIds.set(config.id, new Set());
+      }
+    });
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('加载配置文件失败:', error.message);
+    } else {
+      console.log('配置文件不存在，使用默认配置');
+    }
+  }
+}
+
+/**
+ * 保存推送记录到文件
+ */
+async function saveRecordsToFile() {
+  try {
+    await ensureDataDir();
+    const recordsData = {};
+    for (const [configId, postIds] of pushedPostIds.entries()) {
+      recordsData[configId] = Array.from(postIds);
+    }
+    await fs.writeFile(RECORDS_FILE, JSON.stringify(recordsData, null, 2));
+    console.log('推送记录已保存到文件');
+  } catch (error) {
+    console.error('保存推送记录到文件失败:', error.message);
+  }
+}
+
+/**
+ * 从文件加载推送记录
+ */
+async function loadRecordsFromFile() {
+  try {
+    await ensureDataDir();
+    const data = await fs.readFile(RECORDS_FILE, 'utf8');
+    const records = JSON.parse(data);
+    
+    for (const [configId, postIds] of Object.entries(records)) {
+      pushedPostIds.set(configId, new Set(postIds));
+    }
+    console.log(`从文件加载了 ${Object.keys(records).length} 个配置的推送记录`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('加载推送记录文件失败:', error.message);
+    } else {
+      console.log('推送记录文件不存在，使用空记录');
+    }
+  }
+}
+
+/**
+ * 初始化服务 - 加载配置和记录
+ */
+async function initializeService() {
+  console.log('初始化自动推送服务...');
+  await loadConfigsFromFile();
+  await loadRecordsFromFile();
+  console.log('自动推送服务初始化完成');
+}
+
+/**
  * 生成唯一配置ID
  */
 function generateConfigId() {
@@ -49,7 +162,7 @@ function generateConfigId() {
  * @param {Object} config - 推送配置
  * @returns {Object} 保存后的配置
  */
-function saveConfig(config) {
+async function saveConfig(config) {
   if (!config.id) {
     // 新配置
     config.id = generateConfigId();
@@ -69,6 +182,9 @@ function saveConfig(config) {
     }
   }
   
+  // 保存到文件
+  await saveConfigsToFile();
+  
   console.log(`配置已保存: ${config.name} (${config.id})`);
   return config;
 }
@@ -78,11 +194,15 @@ function saveConfig(config) {
  * @returns {Array} 所有推送配置
  */
 function getAllConfigs() {
-  return pushConfigs.map(config => ({
-    ...config,
-    status: activeTasks.has(config.id) ? 'running' : 'stopped',
-    pushedCount: pushedPostIds.get(config.id)?.size || 0
-  }));
+  return pushConfigs.map(config => {
+    const isRunning = activeTasks.has(config.id);
+    return {
+      ...config,
+      status: isRunning ? 'running' : 'stopped',
+      running: isRunning, // 兼容前端
+      pushedCount: pushedPostIds.get(config.id)?.size || 0
+    };
+  });
 }
 
 /**
@@ -93,9 +213,11 @@ function getAllConfigs() {
 function getConfig(configId) {
   const config = pushConfigs.find(c => c.id === configId);
   if (config) {
+    const isRunning = activeTasks.has(configId);
     return {
       ...config,
-      status: activeTasks.has(configId) ? 'running' : 'stopped',
+      status: isRunning ? 'running' : 'stopped',
+      running: isRunning, // 兼容前端
       pushedCount: pushedPostIds.get(configId)?.size || 0
     };
   }
@@ -106,7 +228,7 @@ function getConfig(configId) {
  * 删除配置
  * @param {string} configId - 配置ID
  */
-function deleteConfig(configId) {
+async function deleteConfig(configId) {
   // 先停止该配置的推送
   stopConfigPush(configId);
   
@@ -117,6 +239,10 @@ function deleteConfig(configId) {
   const index = pushConfigs.findIndex(c => c.id === configId);
   if (index >= 0) {
     const deletedConfig = pushConfigs.splice(index, 1)[0];
+    
+    // 保存到文件
+    await saveConfigsToFile();
+    
     console.log(`配置已删除: ${deletedConfig.name} (${configId})`);
     return true;
   }
@@ -139,20 +265,27 @@ function isPostPushed(configId, postId) {
  * @param {string} configId - 配置ID
  * @param {string} postId - 帖子ID
  */
-function markPostAsPushed(configId, postId) {
+async function markPostAsPushed(configId, postId) {
   if (!pushedPostIds.has(configId)) {
     pushedPostIds.set(configId, new Set());
   }
   pushedPostIds.get(configId).add(postId);
+  
+  // 保存到文件
+  await saveRecordsToFile();
 }
 
 /**
  * 清除配置的推送记录
  * @param {string} configId - 配置ID
  */
-function clearConfigRecords(configId) {
+async function clearConfigRecords(configId) {
   if (pushedPostIds.has(configId)) {
     pushedPostIds.get(configId).clear();
+    
+    // 保存到文件
+    await saveRecordsToFile();
+    
     console.log(`已清除配置 ${configId} 的推送记录`);
   }
 }
@@ -333,15 +466,25 @@ function getSystemStatus() {
 }
 
 module.exports = {
+  // 初始化
+  initializeService,
+  
+  // 配置管理
   saveConfig,
   getAllConfigs,
   getConfig,
   deleteConfig,
+  
+  // 推送控制
   startConfigPush,
   stopConfigPush,
   stopAllPush,
   executeConfigCheck,
+  
+  // 记录管理
   clearConfigRecords,
+  
+  // 状态查询
   getSystemStatus,
   
   // 兼容旧接口（临时）
@@ -351,8 +494,9 @@ module.exports = {
   stopAutoPush: stopAllPush,
   getPushStatus: getSystemStatus,
   manualPushCheck: () => pushConfigs.length > 0 ? executeConfigCheck(pushConfigs[0].id) : Promise.resolve({ success: false }),
-  clearPushedRecords: () => {
+  clearPushedRecords: async () => {
     pushedPostIds.clear();
+    await saveRecordsToFile();
     console.log('所有推送记录已清除');
   }
 };

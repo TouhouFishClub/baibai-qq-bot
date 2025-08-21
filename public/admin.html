@@ -1076,11 +1076,12 @@
                         `;
                     } else {
                         const configsHtml = configs.map(config => {
-                            const statusBadge = config.running ? 
+                            const isRunning = config.status === 'running' || config.running === true;
+                            const statusBadge = isRunning ? 
                                 '<span class="badge bg-success">运行中</span>' : 
                                 '<span class="badge bg-secondary">已停止</span>';
                             
-                            const actions = config.running ? 
+                            const actions = isRunning ? 
                                 `<button class="btn btn-warning btn-sm me-1" onclick="stopConfig('${config.id}')">停止</button>` :
                                 `<button class="btn btn-success btn-sm me-1" onclick="startConfig('${config.id}')">启动</button>`;
                             

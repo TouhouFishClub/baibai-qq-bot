@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  initializeService,
   saveConfig,
   getAllConfigs,
   getConfig,
@@ -26,6 +27,9 @@ const {
   manualPushCheck,
   clearPushedRecords
 } = require('../services/autoPushService');
+
+// 初始化服务
+initializeService().catch(console.error);
 
 const {
   getLatestPosts,
@@ -142,7 +146,7 @@ router.post('/configs', async (req, res) => {
       });
     }
     
-    const savedConfig = saveConfig(configData);
+    const savedConfig = await saveConfig(configData);
     
     res.json({
       success: true,
@@ -167,7 +171,7 @@ router.post('/configs', async (req, res) => {
 router.delete('/configs/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = deleteConfig(id);
+    const deleted = await deleteConfig(id);
     
     if (!deleted) {
       return res.status(404).json({
@@ -274,7 +278,7 @@ router.post('/configs/:id/check', async (req, res) => {
 router.post('/configs/:id/clear-records', async (req, res) => {
   try {
     const { id } = req.params;
-    clearConfigRecords(id);
+    await clearConfigRecords(id);
     
     res.json({
       success: true,
@@ -402,7 +406,7 @@ router.post('/config', async (req, res) => {
       sourceName: sourceName || '洛奇官网'
     };
     
-    setPushConfig(config);
+    await setPushConfig(config);
     
     res.json({
       success: true,
@@ -614,7 +618,7 @@ router.get('/test-detail', async (req, res) => {
  */
 router.post('/clear-records', async (req, res) => {
   try {
-    clearPushedRecords();
+    await clearPushedRecords();
     
     res.json({
       success: true,
