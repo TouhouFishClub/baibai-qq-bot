@@ -114,9 +114,13 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <button id="loadGuilds" class="btn btn-outline-primary btn-sm mb-3">
+                        <button id="loadGuilds" class="btn btn-outline-primary btn-sm mb-2">
                             <i class="fas fa-refresh me-1"></i>
                             加载频道服务器
+                        </button>
+                        <button id="testLoading" class="btn btn-outline-secondary btn-sm mb-3 ms-2">
+                            <i class="fas fa-spinner me-1"></i>
+                            测试Loading
                         </button>
                         
                         <div id="guildsContainer">
@@ -211,7 +215,7 @@
     </div>
 
     <!-- Loading模态框 -->
-    <div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal" id="loadingModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-body text-center">
@@ -329,20 +333,26 @@
 
         // 加载频道服务器列表
         async function loadGuilds() {
+            console.log('开始加载频道服务器...');
             showLoading();
             try {
                 const response = await fetch('/put/guilds');
                 const result = await response.json();
+                console.log('获取到响应:', result);
                 
                 if (result.success) {
                     displayGuilds(result.data);
+                    console.log('频道服务器列表显示完成');
                 } else {
                     showError('加载频道服务器失败: ' + result.message);
                 }
             } catch (error) {
+                console.error('请求失败:', error);
                 showError('请求失败: ' + error.message);
             } finally {
+                console.log('开始隐藏Loading...');
                 hideLoading();
+                console.log('Loading隐藏完成');
             }
         }
 
@@ -372,20 +382,26 @@
 
         // 加载子频道列表
         async function loadChannels(guildId, guildName) {
+            console.log('开始加载子频道...');
             showLoading();
             try {
                 const response = await fetch(`/put/channels?guild_id=${guildId}`);
                 const result = await response.json();
+                console.log('获取到子频道响应:', result);
                 
                 if (result.success) {
                     displayChannels(result.data, guildName);
+                    console.log('子频道列表显示完成');
                 } else {
                     showError('加载子频道失败: ' + result.message);
                 }
             } catch (error) {
+                console.error('子频道请求失败:', error);
                 showError('请求失败: ' + error.message);
             } finally {
+                console.log('开始隐藏子频道Loading...');
                 hideLoading();
+                console.log('子频道Loading隐藏完成');
             }
         }
 
@@ -529,16 +545,64 @@
             }
         }
 
+        // 测试Loading功能
+        function testLoading() {
+            console.log('测试Loading开始');
+            showLoading();
+            setTimeout(() => {
+                console.log('3秒后隐藏Loading');
+                hideLoading();
+            }, 3000);
+        }
+
+        // 全局模态框实例
+        let loadingModal = null;
+
         // 显示加载状态
         function showLoading() {
-            const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
-            modal.show();
+            if (!loadingModal) {
+                loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'), {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+            }
+            loadingModal.show();
         }
 
         // 隐藏加载状态
         function hideLoading() {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
-            if (modal) modal.hide();
+            console.log('hideLoading 被调用');
+            
+            // 方法1: 使用Bootstrap模态框API
+            if (loadingModal) {
+                console.log('使用Bootstrap API隐藏模态框');
+                loadingModal.hide();
+            }
+            
+            // 方法2: 强制隐藏（备用方案）
+            setTimeout(() => {
+                console.log('执行强制隐藏逻辑');
+                const modalElement = document.getElementById('loadingModal');
+                
+                // 强制移除所有模态框相关的类和样式
+                modalElement.classList.remove('show', 'fade');
+                modalElement.style.display = 'none';
+                modalElement.setAttribute('aria-hidden', 'true');
+                modalElement.removeAttribute('aria-modal');
+                
+                // 移除body上的模态框类
+                document.body.classList.remove('modal-open');
+                
+                // 移除所有背景遮罩
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                
+                // 重置body样式
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                
+                console.log('强制隐藏完成');
+            }, 50);
         }
 
         // 显示成功消息
@@ -574,6 +638,7 @@
             
             // 绑定事件
             document.getElementById('loadGuilds').addEventListener('click', loadGuilds);
+            document.getElementById('testLoading').addEventListener('click', testLoading);
             document.getElementById('postForm').addEventListener('submit', publishPost);
             document.getElementById('previewBtn').addEventListener('click', updatePreview);
             document.getElementById('clearBtn').addEventListener('click', clearContent);
