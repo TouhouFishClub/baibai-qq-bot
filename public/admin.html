@@ -462,11 +462,11 @@
             // 控制手动发帖输入的显示/隐藏
             const manualInputs = document.querySelector('.manual-post-inputs');
             if (editorType === 'autopush') {
-                manualInputs.style.display = 'none';
-                loadPushStatus();
-                loadPushConfig();
+                if (manualInputs) manualInputs.style.display = 'none';
+                loadSystemStatus();
+                loadConfigsList();
             } else {
-                manualInputs.style.display = 'block';
+                if (manualInputs) manualInputs.style.display = 'block';
                 updatePreview();
                 updatePublishButton();
             }
@@ -1008,6 +1008,144 @@
             addPushLog(`URL: ${url}`, 'info');
         }
 
+        // 设置配置预设
+        function setConfigPreset(url, sourceName, titlePrefix, configName) {
+            document.getElementById('configSourceUrl').value = url;
+            document.getElementById('configSourceName').value = sourceName;
+            document.getElementById('configTitlePrefix').value = titlePrefix;
+            document.getElementById('configName').value = configName;
+        }
+
+        // 加载系统状态
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/auto-push/system-status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const status = result.data;
+                    const statusHtml = `
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <span class="badge ${status.runningConfigs > 0 ? 'bg-success' : 'bg-secondary'} me-2">
+                                    ${status.runningConfigs > 0 ? '运行中' : '已停止'}
+                                </span>
+                                <span class="text-muted">
+                                    配置总数: ${status.totalConfigs} | 运行中: ${status.runningConfigs}
+                                </span>
+                            </div>
+                            <small class="text-muted">
+                                ${new Date().toLocaleString()}
+                            </small>
+                        </div>
+                    `;
+                    document.getElementById('systemStatus').innerHTML = statusHtml;
+                } else {
+                    throw new Error(result.message || '获取系统状态失败');
+                }
+            } catch (error) {
+                console.error('加载系统状态失败:', error);
+                document.getElementById('systemStatus').innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-danger me-2">错误</span>
+                        <span class="text-danger">${error.message}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // 加载配置列表
+        async function loadConfigsList() {
+            try {
+                const response = await fetch('/auto-push/configs');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const configs = result.data.configs || [];
+                    const configsListEl = document.getElementById('configsList');
+                    
+                    if (configs.length === 0) {
+                        configsListEl.innerHTML = `
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-2x mb-3 d-block"></i>
+                                <p>暂无推送配置</p>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="showConfigModal()">
+                                    <i class="fas fa-plus me-1"></i>创建第一个配置
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        const configsHtml = configs.map(config => {
+                            const statusBadge = config.running ? 
+                                '<span class="badge bg-success">运行中</span>' : 
+                                '<span class="badge bg-secondary">已停止</span>';
+                            
+                            const actions = config.running ? 
+                                `<button class="btn btn-warning btn-sm me-1" onclick="stopConfig('${config.id}')">停止</button>` :
+                                `<button class="btn btn-success btn-sm me-1" onclick="startConfig('${config.id}')">启动</button>`;
+                            
+                            return `
+                                <div class="card mb-2">
+                                    <div class="card-body py-2">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-3">
+                                                <h6 class="mb-1">${config.name}</h6>
+                                                <small class="text-muted">${config.sourceName}</small>
+                                            </div>
+                                            <div class="col-md-2">
+                                                ${statusBadge}
+                                            </div>
+                                            <div class="col-md-2">
+                                                <small class="text-muted">
+                                                    ${Math.round(config.checkInterval / 60000)}分钟/次
+                                                </small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <small class="text-muted text-truncate d-block" style="max-width: 200px;">
+                                                    频道: ${config.channelId}
+                                                </small>
+                                            </div>
+                                            <div class="col-md-2 text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    ${actions}
+                                                    <button class="btn btn-outline-primary btn-sm me-1" onclick="editConfig('${config.id}')">编辑</button>
+                                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item" href="#" onclick="testConfig('${config.id}')">测试抓取</a></li>
+                                                        <li><a class="dropdown-item" href="#" onclick="manualCheckConfig('${config.id}')">手动检查</a></li>
+                                                        <li><a class="dropdown-item" href="#" onclick="clearConfigRecords('${config.id}')">清除记录</a></li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteConfig('${config.id}')">删除配置</a></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                        
+                        configsListEl.innerHTML = configsHtml;
+                    }
+                } else {
+                    throw new Error(result.message || '获取配置列表失败');
+                }
+            } catch (error) {
+                console.error('加载配置列表失败:', error);
+                document.getElementById('configsList').innerHTML = `
+                    <div class="text-center text-danger py-4">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-3 d-block"></i>
+                        <p>加载配置列表失败: ${error.message}</p>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadConfigsList()">
+                            <i class="fas fa-refresh me-1"></i>重试
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
         // 测试详情抓取
         async function testDetail() {
             try {
@@ -1063,7 +1201,258 @@
             }
         }
 
+        // 配置管理函数
+        function showConfigModal(configId = null) {
+            const modal = new bootstrap.Modal(document.getElementById('configModal'));
+            const modalTitle = document.getElementById('configModalLabel');
+            
+            if (configId) {
+                modalTitle.textContent = '编辑推送配置';
+                loadConfigData(configId);
+            } else {
+                modalTitle.textContent = '新增推送配置';
+                clearConfigForm();
+            }
+            
+            modal.show();
+        }
 
+        function clearConfigForm() {
+            document.getElementById('configId').value = '';
+            document.getElementById('configName').value = '';
+            document.getElementById('configChannelId').value = '';
+            document.getElementById('configInterval').value = '10';
+            document.getElementById('configFormat').value = '3';
+            document.getElementById('configTitlePrefix').value = '[洛奇资讯]';
+            document.getElementById('configSourceName').value = '洛奇官网';
+            document.getElementById('configSourceUrl').value = '';
+        }
+
+        async function loadConfigData(configId) {
+            try {
+                const response = await fetch(`/auto-push/configs/${configId}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const config = result.data;
+                    document.getElementById('configId').value = config.id;
+                    document.getElementById('configName').value = config.name;
+                    document.getElementById('configChannelId').value = config.channelId;
+                    document.getElementById('configInterval').value = Math.round(config.checkInterval / 60000);
+                    document.getElementById('configFormat').value = config.format;
+                    document.getElementById('configTitlePrefix').value = config.titlePrefix || '[洛奇资讯]';
+                    document.getElementById('configSourceName').value = config.sourceName || '洛奇官网';
+                    document.getElementById('configSourceUrl').value = config.sourceUrl;
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                alert('加载配置失败: ' + error.message);
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                const configData = {
+                    id: document.getElementById('configId').value || undefined,
+                    name: document.getElementById('configName').value,
+                    channelId: document.getElementById('configChannelId').value,
+                    checkInterval: parseInt(document.getElementById('configInterval').value) * 60000,
+                    format: parseInt(document.getElementById('configFormat').value),
+                    titlePrefix: document.getElementById('configTitlePrefix').value,
+                    sourceName: document.getElementById('configSourceName').value,
+                    sourceUrl: document.getElementById('configSourceUrl').value
+                };
+
+                // 基本验证
+                if (!configData.name || !configData.channelId || !configData.sourceUrl) {
+                    alert('请填写必需字段（配置名称、频道ID、源URL）');
+                    return;
+                }
+
+                showLoading();
+                const response = await fetch('/auto-push/configs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(configData)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+                    modal.hide();
+                    await loadConfigsList();
+                    addPushLog(`配置${configData.id ? '更新' : '创建'}成功: ${configData.name}`, 'success');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                alert('保存配置失败: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function startConfig(configId) {
+            try {
+                showLoading();
+                const response = await fetch(`/auto-push/configs/${configId}/start`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    await loadConfigsList();
+                    await loadSystemStatus();
+                    addPushLog(`配置启动成功: ${result.data.name}`, 'success');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('启动配置失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function stopConfig(configId) {
+            try {
+                showLoading();
+                const response = await fetch(`/auto-push/configs/${configId}/stop`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    await loadConfigsList();
+                    await loadSystemStatus();
+                    addPushLog(`配置停止成功: ${result.data.name}`, 'info');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('停止配置失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function deleteConfig(configId) {
+            if (!confirm('确定要删除这个配置吗？此操作不可撤销。')) {
+                return;
+            }
+
+            try {
+                showLoading();
+                const response = await fetch(`/auto-push/configs/${configId}`, { method: 'DELETE' });
+                const result = await response.json();
+
+                if (result.success) {
+                    await loadConfigsList();
+                    await loadSystemStatus();
+                    addPushLog('配置删除成功', 'success');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('删除配置失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function editConfig(configId) {
+            showConfigModal(configId);
+        }
+
+        async function manualCheckConfig(configId) {
+            try {
+                showLoading();
+                const response = await fetch(`/auto-push/configs/${configId}/check`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    addPushLog(`手动检查完成: ${result.data.message || '检查成功'}`, 'info');
+                    if (result.data.newPosts) {
+                        addPushLog(`发现 ${result.data.newPosts} 篇新帖子`, 'success');
+                    }
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('手动检查失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function clearConfigRecords(configId) {
+            if (!confirm('确定要清除这个配置的推送记录吗？')) {
+                return;
+            }
+
+            try {
+                showLoading();
+                const response = await fetch(`/auto-push/configs/${configId}/clear-records`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    addPushLog('推送记录清除成功', 'success');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('清除记录失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function testConfig(configId) {
+            try {
+                showLoading();
+                const config = await fetch(`/auto-push/configs/${configId}`).then(r => r.json());
+                if (!config.success) {
+                    throw new Error('获取配置失败');
+                }
+
+                const response = await fetch(`/auto-push/test-crawl?url=${encodeURIComponent(config.data.sourceUrl)}&limit=5`);
+                const result = await response.json();
+
+                if (result.success) {
+                    addPushLog(`测试抓取完成: ${config.data.name}`, 'info');
+                    addPushLog(`URL: ${config.data.sourceUrl}`, 'info');
+                    addPushLog(`今日帖子: ${result.data.todayPosts.length} 篇`, 'info');
+                    addPushLog(`最新帖子: ${result.data.latestPosts.length} 篇`, 'info');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('测试抓取失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function stopAllConfigs() {
+            if (!confirm('确定要停止所有推送配置吗？')) {
+                return;
+            }
+
+            try {
+                showLoading();
+                const response = await fetch('/auto-push/stop-all', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    await loadConfigsList();
+                    await loadSystemStatus();
+                    addPushLog('所有推送已停止', 'info');
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                addPushLog('停止全部失败: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
 
         // 全局模态框实例
         let loadingModal = null;
@@ -1154,14 +1543,14 @@
             document.getElementById('clearBtn').addEventListener('click', clearContent);
             document.getElementById('postTitle').addEventListener('input', updatePublishButton);
             
-            // 自动推送相关事件
-            document.getElementById('startPushBtn').addEventListener('click', startPush);
-            document.getElementById('stopPushBtn').addEventListener('click', stopPush);
-            document.getElementById('manualCheckBtn').addEventListener('click', manualCheck);
-            document.getElementById('savePushConfigBtn').addEventListener('click', savePushConfig);
-            document.getElementById('testCrawlBtn').addEventListener('click', testCrawl);
-            document.getElementById('testDetailBtn').addEventListener('click', testDetail);
-            document.getElementById('clearRecordsBtn').addEventListener('click', clearPushRecords);
+            // 多配置自动推送相关事件
+            document.getElementById('addConfigBtn').addEventListener('click', () => showConfigModal());
+            document.getElementById('stopAllBtn').addEventListener('click', stopAllConfigs);
+            document.getElementById('refreshConfigsBtn').addEventListener('click', () => {
+                loadSystemStatus();
+                loadConfigsList();
+            });
+            document.getElementById('saveConfigBtn').addEventListener('click', saveConfig);
 
             
             // 编辑器切换事件
