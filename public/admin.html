@@ -220,119 +220,54 @@
 
                             <!-- 自动推送管理 -->
                             <div id="autopushEditor" class="editor-content">
-                                <h5 class="mb-3">洛奇官网自动推送管理</h5>
+                                <h5 class="mb-3">多配置自动推送管理</h5>
                                 
-                                <!-- 推送状态 -->
+                                <!-- 系统状态和操作 -->
                                 <div class="row mb-4">
-                                    <div class="col-md-6">
+                                    <div class="col-md-8">
                                         <div class="card">
                                             <div class="card-body">
-                                                <h6 class="card-title">推送状态</h6>
-                                                <div id="pushStatus">
+                                                <h6 class="card-title">系统状态</h6>
+                                                <div id="systemStatus">
                                                     <div class="d-flex align-items-center">
-                                                        <span class="badge bg-secondary me-2">未知</span>
+                                                        <span class="badge bg-secondary me-2">加载中</span>
                                                         <span class="text-muted">正在获取状态...</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="card">
                                             <div class="card-body">
-                                                <h6 class="card-title">快速操作</h6>
-                                                <div class="btn-group" role="group">
-                                                    <button type="button" class="btn btn-success btn-sm" id="startPushBtn">启动</button>
-                                                    <button type="button" class="btn btn-warning btn-sm" id="stopPushBtn">停止</button>
-                                                    <button type="button" class="btn btn-info btn-sm" id="manualCheckBtn">手动检查</button>
+                                                <h6 class="card-title">全局操作</h6>
+                                                <div class="btn-group w-100" role="group">
+                                                    <button type="button" class="btn btn-success btn-sm" id="addConfigBtn">新增配置</button>
+                                                    <button type="button" class="btn btn-warning btn-sm" id="stopAllBtn">停止全部</button>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- 推送配置 -->
+                                <!-- 配置列表 -->
                                 <div class="card mb-4">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">推送配置</h6>
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">推送配置列表</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="refreshConfigsBtn">
+                                            <i class="fas fa-refresh me-1"></i>刷新
+                                        </button>
                                     </div>
                                     <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="pushChannelId" class="form-label">目标频道ID</label>
-                                                    <input type="text" class="form-control" id="pushChannelId" placeholder="请输入频道ID">
-                                                    <div class="form-text">选择左侧频道可自动填入</div>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="pushInterval" class="form-label">检查间隔（分钟）</label>
-                                                    <input type="number" class="form-control" id="pushInterval" value="10" min="1" max="1440">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="pushFormat" class="form-label">推送格式</label>
-                                                    <select class="form-select" id="pushFormat">
-                                                        <option value="3">Markdown</option>
-                                                        <option value="2">HTML</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="titlePrefix" class="form-label">标题前缀</label>
-                                                    <input type="text" class="form-control" id="titlePrefix" value="[洛奇资讯]">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="sourceName" class="form-label">源站名称</label>
-                                                    <input type="text" class="form-control" id="sourceName" value="洛奇官网" placeholder="例如：洛奇官网">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label for="sourceUrl" class="form-label">源URL</label>
-                                                    <div class="input-group">
-                                                        <input type="url" class="form-control" id="sourceUrl" placeholder="https://example.com/news" value="https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html">
-                                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                                            预设
-                                                        </button>
-                                                        <ul class="dropdown-menu">
-                                                            <li><a class="dropdown-item" href="#" onclick="setPresetUrl('https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html', '洛奇官网', '[洛奇资讯]')">洛奇官网 - 游戏新闻</a></li>
-                                                            <li><a class="dropdown-item" href="#" onclick="setPresetUrl('https://luoqi.tiancity.com/homepage/article/Class_244_Time_1.html', '洛奇官网', '[洛奇活动]')">洛奇官网 - 活动公告</a></li>
-                                                            <li><hr class="dropdown-divider"></li>
-                                                            <li><a class="dropdown-item text-muted" href="#">更多预设待添加...</a></li>
-                                                        </ul>
-                                                    </div>
-                                                    <div class="form-text">支持任何包含日期格式 [YYYY-MM-DD] 的新闻列表页面</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button type="button" class="btn btn-primary" id="savePushConfigBtn">保存配置</button>
-                                    </div>
-                                </div>
-
-                                <!-- 测试区域 -->
-                                <div class="card mb-4">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">测试功能</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <button type="button" class="btn btn-outline-primary me-2" id="testCrawlBtn">
-                                                    <i class="fas fa-spider me-1"></i>
-                                                    测试抓取
-                                                </button>
-                                                <button type="button" class="btn btn-outline-info me-2" id="testDetailBtn">
-                                                    <i class="fas fa-file-alt me-1"></i>
-                                                    测试详情
-                                                </button>
-                                                <button type="button" class="btn btn-outline-secondary" id="clearRecordsBtn">
-                                                    <i class="fas fa-trash me-1"></i>
-                                                    清除记录
-                                                </button>
+                                        <div id="configsList">
+                                            <div class="text-center text-muted">
+                                                <i class="fas fa-spinner fa-spin me-2"></i>正在加载配置...
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- 日志显示 -->
+                                <!-- 操作日志 -->
                                 <div class="card">
                                     <div class="card-header">
                                         <h6 class="mb-0">操作日志</h6>
@@ -343,6 +278,8 @@
                                         </div>
                                     </div>
                                 </div>
+
+
                             </div>
                         </form>
                     </div>
@@ -367,6 +304,77 @@
                         <span class="visually-hidden">Loading...</span>
                     </div>
                     <p class="mt-2 mb-0">正在处理请求...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置编辑模态框 -->
+    <div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="configModalLabel">编辑推送配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="configForm">
+                        <input type="hidden" id="configId">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="configName" class="form-label">配置名称 *</label>
+                                    <input type="text" class="form-control" id="configName" placeholder="例如：洛奇游戏新闻" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="configChannelId" class="form-label">目标频道ID *</label>
+                                    <input type="text" class="form-control" id="configChannelId" placeholder="请输入频道ID" required>
+                                    <div class="form-text">选择左侧频道可自动填入</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="configInterval" class="form-label">检查间隔（分钟）</label>
+                                    <input type="number" class="form-control" id="configInterval" value="10" min="1" max="1440">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="configFormat" class="form-label">推送格式</label>
+                                    <select class="form-select" id="configFormat">
+                                        <option value="3">Markdown</option>
+                                        <option value="2">HTML</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="configTitlePrefix" class="form-label">标题前缀</label>
+                                    <input type="text" class="form-control" id="configTitlePrefix" value="[洛奇资讯]">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="configSourceName" class="form-label">源站名称</label>
+                                    <input type="text" class="form-control" id="configSourceName" value="洛奇官网" placeholder="例如：洛奇官网">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="configSourceUrl" class="form-label">源URL *</label>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="configSourceUrl" placeholder="https://example.com/news" required>
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    预设
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="setConfigPreset('https://luoqi.tiancity.com/homepage/article/Class_224_Time_1.html', '洛奇官网', '[洛奇游戏]', '洛奇游戏新闻')">洛奇官网 - 游戏新闻</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setConfigPreset('https://luoqi.tiancity.com/homepage/article/Class_232_Time_1.html', '洛奇官网', '[洛奇活动]', '洛奇活动公告')">洛奇官网 - 活动公告</a></li>
+                                </ul>
+                            </div>
+                            <div class="form-text">支持任何包含日期格式 [YYYY-MM-DD] 的新闻列表页面</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveConfigBtn">保存配置</button>
                 </div>
             </div>
         </div>
