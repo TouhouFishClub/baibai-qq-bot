@@ -40,6 +40,10 @@ let intervalId = null;
  */
 function setPushConfig(config) {
   pushConfig = { ...pushConfig, ...config };
+  // 如果设置了channelId等关键配置，自动启用推送
+  if (config.channelId && config.sourceUrl) {
+    pushConfig.enabled = true;
+  }
   console.log('推送配置已更新:', pushConfig);
 }
 
