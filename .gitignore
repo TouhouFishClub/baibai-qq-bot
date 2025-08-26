@@ -40,6 +40,8 @@ doc/
 
 # 环境变量文件
 .env
+config.env
+
 
 # 临时文件目录
 public/temp_images/
