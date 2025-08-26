@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const config = require('./config');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../config.env') });
 
 // 引入中间件
 const verifySignature = require('../middlewares/signatureVerification');
@@ -12,6 +12,7 @@ const verifySignature = require('../middlewares/signatureVerification');
 const webhookController = require('../controllers/webhookController');
 const forumRoutes = require('../routes/forumRoutes');
 const autoPushRoutes = require('../routes/autoPushRoutes');
+const adminAuthRoutes = require('../routes/adminAuthRoutes');
 
 // 引入自动推送服务
 const autoPushService = require('../services/autoPushService');
@@ -50,6 +51,9 @@ app.use('/put', forumRoutes);
 
 // 自动推送路由
 app.use('/auto-push', autoPushRoutes);
+
+// 管理员认证路由
+app.use('/admin', adminAuthRoutes);
 
 // 管理页面路由
 app.get('/admin', (req, res) => {
