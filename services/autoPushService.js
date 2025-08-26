@@ -298,12 +298,6 @@ async function clearConfigRecords(configId) {
  */
 async function pushSinglePost(config, post) {
   try {
-    // 检查是否已推送
-    if (isPostPushed(config.id, post.id)) {
-      console.log(`帖子 "${post.title}" 已推送过，跳过`);
-      return { success: false, reason: 'already_pushed' };
-    }
-    
     // 获取帖子详情内容
     let detail = null;
     try {
@@ -332,7 +326,7 @@ async function pushSinglePost(config, post) {
     
     if (result.success) {
       // 标记为已推送
-      markPostAsPushed(config.id, post.id);
+      await markPostAsPushed(config.id, post.id);
       console.log(`帖子推送成功: ${title}`);
       return { success: true, post: post, title: title };
     } else {
@@ -360,13 +354,22 @@ async function executeConfigCheck(configId) {
   try {
     console.log(`开始检查配置: ${config.name}`);
     
-    // 获取今日最新帖子
-    const todayPosts = await getTodayLatestPosts(config.sourceUrl);
+    // 获取最新帖子（不限制只获取今天的，避免遗漏）
+    const latestPosts = await getLatestPosts(config.sourceUrl, 10);
     
     let pushedCount = 0;
+    let skippedCount = 0;
     const results = [];
     
-    for (const post of todayPosts) {
+    for (const post of latestPosts) {
+      // 检查是否已推送
+      if (isPostPushed(config.id, post.id)) {
+        console.log(`帖子 "${post.title}" 已推送过，跳过`);
+        skippedCount++;
+        results.push({ success: false, reason: 'already_pushed', post: post });
+        continue;
+      }
+      
       const result = await pushSinglePost(config, post);
       results.push(result);
       if (result.success) {
@@ -374,13 +377,14 @@ async function executeConfigCheck(configId) {
       }
     }
     
-    console.log(`配置 ${config.name} 检查完成，推送了 ${pushedCount} 篇新帖子`);
+    console.log(`配置 ${config.name} 检查完成，推送了 ${pushedCount} 篇新帖子，跳过了 ${skippedCount} 篇已推送的帖子`);
     
     return {
       success: true,
       configName: config.name,
-      todayPostsCount: todayPosts.length,
+      totalPostsCount: latestPosts.length,
       pushedCount: pushedCount,
+      skippedCount: skippedCount,
       results: results
     };
     

@@ -1,0 +1,11 @@
+{
+  "config1": [
+    "post1",
+    "post2",
+    "post3"
+  ],
+  "config2": [
+    "post4",
+    "post5"
+  ]
+}

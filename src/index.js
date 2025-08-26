@@ -13,6 +13,9 @@ const webhookController = require('../controllers/webhookController');
 const forumRoutes = require('../routes/forumRoutes');
 const autoPushRoutes = require('../routes/autoPushRoutes');
 
+// 引入自动推送服务
+const autoPushService = require('../services/autoPushService');
+
 // 初始化Express应用
 const app = express();
 const PORT = process.env.PORT || config.server.port;
@@ -78,11 +81,19 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);
   console.log(`环境: ${config.server.environment}`);
   console.log(`机器人名称: ${process.env.QQ_BOT_NAME}`);
   console.log(`QQ Webhook 路径: http://localhost:${PORT}/qq/webhook`);
+  
+  // 初始化自动推送服务
+  try {
+    await autoPushService.initializeService();
+    console.log('自动推送服务初始化完成');
+  } catch (error) {
+    console.error('自动推送服务初始化失败:', error.message);
+  }
 });
 
 module.exports = app; 

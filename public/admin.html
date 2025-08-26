@@ -93,20 +93,127 @@
             overflow-y: auto;
         }
         
-
+        /* 认证相关样式 */
+        .auth-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 0.5rem 0.5rem 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .auth-header h4 {
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
+    <!-- 认证检查脚本 -->
+    <script>
+        // 检查用户是否已登录
+        function checkAuth() {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                // 未登录，跳转到登录页面
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            // 验证token有效性
+            fetch('/admin/verify-token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    // token无效，跳转到登录页面
+                    localStorage.removeItem('adminToken');
+                    window.location.href = '/login.html';
+                } else {
+                    // token有效，显示用户信息
+                    displayUserInfo(data.data);
+                }
+            })
+            .catch(() => {
+                // 网络错误，跳转到登录页面
+                localStorage.removeItem('adminToken');
+                window.location.href = '/login.html';
+            });
+        }
+        
+        // 显示用户信息
+        function displayUserInfo(userData) {
+            const userInfoEl = document.getElementById('userInfo');
+            if (userInfoEl && userData) {
+                userInfoEl.textContent = userData.username || '管理员';
+            }
+        }
+        
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('adminToken');
+                window.location.href = '/login.html';
+            }
+        }
+        
+        // 页面加载时检查认证
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkAuth);
+        } else {
+            checkAuth();
+        }
+    </script>
+
     <div class="main-container">
+        <!-- 认证头部 -->
+        <div class="auth-header">
+            <h4>
+                <i class="fas fa-robot me-2"></i>
+                QQ机器人论坛发帖管理
+            </h4>
+            <div class="user-info">
+                <span>欢迎，<span id="userInfo">管理员</span></span>
+                <a href="#" class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt me-1"></i>
+                    退出登录
+                </a>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-12">
                 <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-robot me-2"></i>
-                            QQ机器人论坛发帖管理
-                        </h4>
-                    </div>
                     <div class="card-body">
                         <p class="text-muted">使用此管理页面向QQ频道论坛发布文章，支持Markdown和HTML格式。</p>
                     </div>
