@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const config = require('./config');
-require('dotenv').config({ path: path.join(__dirname, '../config.env') });
+require('dotenv').config();
 
 // 引入中间件
 const verifySignature = require('../middlewares/signatureVerification');

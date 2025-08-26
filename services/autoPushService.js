@@ -359,7 +359,11 @@ async function executeConfigCheck(configId) {
     
     let pushedCount = 0;
     let skippedCount = 0;
+    let outdatedCount = 0;
     const results = [];
+    
+    // 获取今天的日期
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD格式
     
     for (const post of latestPosts) {
       // 检查是否已推送
@@ -370,6 +374,14 @@ async function executeConfigCheck(configId) {
         continue;
       }
       
+      // 检查文章日期，只推送今天的文章
+      if (post.date !== today) {
+        console.log(`帖子 "${post.title}" 发布日期为 ${post.date}，不是今天的文章，跳过`);
+        outdatedCount++;
+        results.push({ success: false, reason: 'outdated', post: post, date: post.date });
+        continue;
+      }
+      
       const result = await pushSinglePost(config, post);
       results.push(result);
       if (result.success) {
@@ -377,7 +389,7 @@ async function executeConfigCheck(configId) {
       }
     }
     
-    console.log(`配置 ${config.name} 检查完成，推送了 ${pushedCount} 篇新帖子，跳过了 ${skippedCount} 篇已推送的帖子`);
+    console.log(`配置 ${config.name} 检查完成，推送了 ${pushedCount} 篇新帖子，跳过了 ${skippedCount} 篇已推送的帖子，跳过了 ${outdatedCount} 篇过期帖子`);
     
     return {
       success: true,
@@ -385,6 +397,7 @@ async function executeConfigCheck(configId) {
       totalPostsCount: latestPosts.length,
       pushedCount: pushedCount,
       skippedCount: skippedCount,
+      outdatedCount: outdatedCount,
       results: results
     };
     
