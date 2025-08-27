@@ -305,19 +305,11 @@ async function getLatestPosts(url, limit = 5) {
 function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) {
   let content = `# ${post.title}
 
-**发布日期**: ${post.date}
-
-**来源**: [${sourceName}](${post.url})
-
----
-
 `;
 
   if (detail && detail.textContent) {
     // 使用详情内容
     content += `${detail.textContent.substring(0, 500)}...
-
-> 查看完整内容请访问：[原文链接](${post.url})
 
 `;
   } else {
@@ -327,7 +319,13 @@ function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) 
 `;
   }
 
-  content += `**帖子ID**: \`${post.id}\``;
+  content += `---
+
+**发布日期**: ${post.date}
+
+**来源**: [${sourceName}](${post.url})
+
+**帖子ID**: \`${post.id}\``;
   
   return content;
 }
@@ -342,12 +340,6 @@ function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) 
 function formatPostToHTML(post, sourceName = '洛奇官网', detail = null) {
   let content = `<h1>${post.title}</h1>
 
-<p><strong>发布日期</strong>: ${post.date}</p>
-
-<p><strong>来源</strong>: <a href="${post.url}">${sourceName}</a></p>
-
-<hr>
-
 `;
 
   if (detail && detail.htmlContent) {
@@ -356,21 +348,32 @@ function formatPostToHTML(post, sourceName = '洛奇官网', detail = null) {
 ${detail.htmlContent}
 </div>
 
-<hr>
-
-<p><a href="${post.url}">查看原文</a></p>
+`;
+  } else if (detail && detail.textContent) {
+    // 使用详情文本内容
+    content += `<div class="post-content">
+<p>${detail.textContent.substring(0, 500)}...</p>
+</div>
 
 `;
   } else {
     // 使用基本信息
-    content += `<blockquote>
+    content += `<div class="post-content">
+<blockquote>
 <p>这是从${sourceName}自动抓取的最新帖子信息。</p>
 </blockquote>
+</div>
 
 `;
   }
 
-  content += `<p><strong>帖子ID</strong>: <code>${post.id}</code></p>`;
+  content += `<hr>
+
+<p><strong>发布日期</strong>: ${post.date}</p>
+
+<p><strong>来源</strong>: <a href="${post.url}">${sourceName}</a></p>
+
+<p><strong>帖子ID</strong>: <code>${post.id}</code></p>`;
   
   return content;
 }

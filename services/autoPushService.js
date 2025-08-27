@@ -567,6 +567,8 @@ module.exports = {
   // 记录管理
   clearConfigRecords,
   cleanExpiredRecords,
+  isPostPushed,
+  markPostAsPushed,
   
   // 状态查询
   getSystemStatus,
