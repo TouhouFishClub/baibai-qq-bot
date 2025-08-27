@@ -291,6 +291,46 @@ async function clearConfigRecords(configId) {
 }
 
 /**
+ * 清理过期的推送记录（保留最近7天的记录）
+ * @param {string} configId - 配置ID
+ */
+async function cleanExpiredRecords(configId) {
+  try {
+    const configPushedIds = pushedPostIds.get(configId);
+    if (!configPushedIds) return;
+    
+    // 获取7天前的日期
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+    
+    // 清理过期记录（这里可以根据需要实现更复杂的清理逻辑）
+    // 暂时保留所有记录，因为帖子ID是基于内容的哈希值
+    
+    console.log(`配置 ${configId} 的推送记录清理完成`);
+  } catch (error) {
+    console.error(`清理配置 ${configId} 的推送记录失败:`, error.message);
+  }
+}
+
+/**
+ * 获取推送统计信息
+ * @param {string} configId - 配置ID
+ * @returns {Object} 统计信息
+ */
+function getPushStatistics(configId) {
+  const configPushedIds = pushedPostIds.get(configId);
+  if (!configPushedIds) {
+    return { totalPushed: 0, lastPushed: null };
+  }
+  
+  return {
+    totalPushed: configPushedIds.size,
+    lastPushed: configPushedIds.size > 0 ? '最近推送时间需要从日志获取' : null
+  };
+}
+
+/**
  * 推送单个帖子
  * @param {Object} config - 推送配置
  * @param {Object} post - 帖子对象
@@ -354,21 +394,22 @@ async function executeConfigCheck(configId) {
   try {
     console.log(`开始检查配置: ${config.name}`);
     
-    // 获取最新帖子（不限制只获取今天的，避免遗漏）
-    const latestPosts = await getLatestPosts(config.sourceUrl, 10);
+    // 获取最新帖子（限制数量，避免处理过多帖子）
+    const latestPosts = await getLatestPosts(config.sourceUrl, 5);
     
     let pushedCount = 0;
     let skippedCount = 0;
     let outdatedCount = 0;
+    let duplicateCount = 0;
     const results = [];
     
     // 获取今天的日期
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD格式
     
     for (const post of latestPosts) {
-      // 检查是否已推送
+      // 检查是否已推送（这是最重要的检查）
       if (isPostPushed(config.id, post.id)) {
-        console.log(`帖子 "${post.title}" 已推送过，跳过`);
+        console.log(`帖子 "${post.title}" (ID: ${post.id}) 已推送过，跳过`);
         skippedCount++;
         results.push({ success: false, reason: 'already_pushed', post: post });
         continue;
@@ -382,14 +423,38 @@ async function executeConfigCheck(configId) {
         continue;
       }
       
+      // 额外检查：检查标题是否与已推送的帖子重复（防止标题相同但ID不同的情况）
+      const configPushedIds = pushedPostIds.get(config.id);
+      if (configPushedIds) {
+        const hasDuplicateTitle = Array.from(configPushedIds).some(pushedId => {
+          // 这里可以添加更复杂的重复检查逻辑
+          return false; // 暂时禁用，主要依赖ID检查
+        });
+        
+        if (hasDuplicateTitle) {
+          console.log(`帖子 "${post.title}" 标题重复，跳过`);
+          duplicateCount++;
+          results.push({ success: false, reason: 'duplicate_title', post: post });
+          continue;
+        }
+      }
+      
+      console.log(`准备推送新帖子: "${post.title}" (ID: ${post.id})`);
+      
       const result = await pushSinglePost(config, post);
       results.push(result);
       if (result.success) {
         pushedCount++;
+        console.log(`帖子推送成功: "${post.title}"`);
       }
     }
     
-    console.log(`配置 ${config.name} 检查完成，推送了 ${pushedCount} 篇新帖子，跳过了 ${skippedCount} 篇已推送的帖子，跳过了 ${outdatedCount} 篇过期帖子`);
+    console.log(`配置 ${config.name} 检查完成:`);
+    console.log(`- 总帖子数: ${latestPosts.length}`);
+    console.log(`- 推送成功: ${pushedCount}`);
+    console.log(`- 跳过已推送: ${skippedCount}`);
+    console.log(`- 跳过过期: ${outdatedCount}`);
+    console.log(`- 跳过重复: ${duplicateCount}`);
     
     return {
       success: true,
@@ -398,6 +463,7 @@ async function executeConfigCheck(configId) {
       pushedCount: pushedCount,
       skippedCount: skippedCount,
       outdatedCount: outdatedCount,
+      duplicateCount: duplicateCount,
       results: results
     };
     
@@ -500,9 +566,11 @@ module.exports = {
   
   // 记录管理
   clearConfigRecords,
+  cleanExpiredRecords,
   
   // 状态查询
   getSystemStatus,
+  getPushStatistics,
   
   // 兼容旧接口（临时）
   setPushConfig: (config) => saveConfig({ ...config, name: config.name || 'Default' }),

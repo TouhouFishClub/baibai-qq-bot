@@ -116,7 +116,7 @@ async function fetchLuoqiPosts(url = 'https://luoqi.tiancity.com/homepage/articl
           // 只处理洛奇官网的链接（排除17173等外链）
           if (fullUrl.includes('luoqi.tiancity.com')) {
             posts.push({
-              id: generatePostId(date, title),
+              id: generatePostId(date, title, fullUrl),
               title: title,
               date: date,
               url: fullUrl,
@@ -236,14 +236,16 @@ async function fetchPostDetail(detailUrl) {
 
 /**
  * 生成帖子唯一ID
- * @param {string} date - 日期
+ * @param {string} date - 发布日期
  * @param {string} title - 标题
+ * @param {string} url - 帖子URL
  * @returns {string} 唯一ID
  */
-function generatePostId(date, title) {
-  // 使用日期和标题的哈希值作为唯一ID
+function generatePostId(date, title, url) {
+  // 使用日期、标题和URL的哈希值作为唯一ID，确保更稳定
   const crypto = require('crypto');
-  return crypto.createHash('md5').update(`${date}-${title}`).digest('hex').substring(0, 16);
+  const content = `${date}-${title}-${url}`;
+  return crypto.createHash('md5').update(content).digest('hex').substring(0, 16);
 }
 
 /**
@@ -301,24 +303,31 @@ async function getLatestPosts(url, limit = 5) {
  * @returns {string} Markdown格式的内容
  */
 function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) {
-  let content = '';
-
-  if (detail && detail.textContent) {
-    // 使用详情内容，不显示标题
-    content += `${detail.textContent.substring(0, 500)}...`;
-  } else {
-    // 使用基本信息，不显示标题
-    content += `这是从${sourceName}自动抓取的最新帖子信息。`;
-  }
-
-  // 在正文下面添加日期和来源信息
-  content += `
-
----
+  let content = `# ${post.title}
 
 **发布日期**: ${post.date}
 
-**来源**: [${sourceName}](${post.url})`;
+**来源**: [${sourceName}](${post.url})
+
+---
+
+`;
+
+  if (detail && detail.textContent) {
+    // 使用详情内容
+    content += `${detail.textContent.substring(0, 500)}...
+
+> 查看完整内容请访问：[原文链接](${post.url})
+
+`;
+  } else {
+    // 使用基本信息
+    content += `> 这是从${sourceName}自动抓取的最新帖子信息。
+
+`;
+  }
+
+  content += `**帖子ID**: \`${post.id}\``;
   
   return content;
 }
@@ -331,28 +340,37 @@ function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) 
  * @returns {string} HTML格式的内容
  */
 function formatPostToHTML(post, sourceName = '洛奇官网', detail = null) {
-  let content = '';
-
-  if (detail && detail.htmlContent) {
-    // 使用详情HTML内容，不显示标题
-    content += `<div class="post-content">
-${detail.htmlContent}
-</div>`;
-  } else {
-    // 使用基本信息，不显示标题
-    content += `<blockquote>
-<p>这是从${sourceName}自动抓取的最新帖子信息。</p>
-</blockquote>`;
-  }
-
-  // 在正文下面添加日期和来源信息
-  content += `
-
-<hr>
+  let content = `<h1>${post.title}</h1>
 
 <p><strong>发布日期</strong>: ${post.date}</p>
 
-<p><strong>来源</strong>: <a href="${post.url}">${sourceName}</a></p>`;
+<p><strong>来源</strong>: <a href="${post.url}">${sourceName}</a></p>
+
+<hr>
+
+`;
+
+  if (detail && detail.htmlContent) {
+    // 使用详情HTML内容
+    content += `<div class="post-content">
+${detail.htmlContent}
+</div>
+
+<hr>
+
+<p><a href="${post.url}">查看原文</a></p>
+
+`;
+  } else {
+    // 使用基本信息
+    content += `<blockquote>
+<p>这是从${sourceName}自动抓取的最新帖子信息。</p>
+</blockquote>
+
+`;
+  }
+
+  content += `<p><strong>帖子ID</strong>: <code>${post.id}</code></p>`;
   
   return content;
 }
