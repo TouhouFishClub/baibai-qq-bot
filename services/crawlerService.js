@@ -303,9 +303,7 @@ async function getLatestPosts(url, limit = 5) {
  * @returns {string} Markdown格式的内容
  */
 function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) {
-  let content = `# ${post.title}
-
-`;
+  let content = '';
 
   if (detail && detail.textContent) {
     // 使用详情内容
@@ -338,9 +336,7 @@ function formatPostToMarkdown(post, sourceName = '洛奇官网', detail = null) 
  * @returns {string} HTML格式的内容
  */
 function formatPostToHTML(post, sourceName = '洛奇官网', detail = null) {
-  let content = `<h1>${post.title}</h1>
-
-`;
+  let content = '';
 
   if (detail && detail.htmlContent) {
     // 使用详情HTML内容
