@@ -1,0 +1,22 @@
+{
+  "op": 0,
+  "id": "GROUP_AT_MESSAGE_CREATE:ivdherldzz1hor1ljtz56slzxyvmlyuotdoqupy2xxqkgxwpynhysl6q6ws849",
+  "d": {
+    "id": "ROBOT1.0_iVDHErLdzZ1hOR1ljT-z57C4S3WkBn8.DsdupoJnAcg0QGjYdFrZ-zpFjnqnvGIrCI45HxNHce.FBwiLcwIXK1KTBl0bDXXBybve5OK.Tdk!",
+    "content": " 123",
+    "timestamp": "2025-04-24T14:49:53+08:00",
+    "author": {
+      "id": "F4AAE1C41F7D506F25F70BF1473DB1A8",
+      "member_openid": "F4AAE1C41F7D506F25F70BF1473DB1A8",
+      "union_openid": "F4AAE1C41F7D506F25F70BF1473DB1A8"
+    },
+    "group_id": "2F0073FD9A47773F56B28EA3E4CD7EB8",
+    "group_openid": "2F0073FD9A47773F56B28EA3E4CD7EB8",
+    "message_scene": {
+      "source": "default",
+      "callback_data": ""
+    },
+    "message_type": 0
+  },
+  "t": "GROUP_AT_MESSAGE_CREATE"
+}

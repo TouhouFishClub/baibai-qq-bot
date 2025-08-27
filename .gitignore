@@ -36,12 +36,10 @@ coverage/
 # 临时文件
 tmp/
 temp/
-doc/
 
 # 环境变量文件
 .env
 config.env
-
 
 # 临时文件目录
 public/temp_images/
@@ -52,8 +50,7 @@ config/groups.json
 # 推送系统配置文件和数据文件（忽略实际配置文件，保留示例文件）
 data/push_configs.json
 data/pushed_records.json
-# 不忽略示例文件
-!data/*.example.json
 
-# 其他运行时数据文件
-data/
+# 不忽略示例文件和文档
+!data/*.example.json
+!doc/PUSH_CONFIG_SETUP.md
