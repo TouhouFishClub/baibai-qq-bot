@@ -364,14 +364,15 @@ async function pushSinglePost(config, post) {
     // 调用发帖API
     const result = await publishThread(config.channelId, title, content, config.format);
     
-    if (result.success) {
+    // 检查推送结果：如果有 task_id 说明推送成功
+    if (result && result.task_id) {
       // 标记为已推送
       await markPostAsPushed(config.id, post.id);
-      console.log(`帖子推送成功: ${title}`);
-      return { success: true, post: post, title: title };
+      console.log(`帖子推送成功: ${title} (task_id: ${result.task_id})`);
+      return { success: true, post: post, title: title, taskId: result.task_id };
     } else {
-      console.error(`帖子推送失败: ${result.error}`);
-      return { success: false, error: result.error };
+      console.error(`帖子推送失败: ${result ? JSON.stringify(result) : '未知错误'}`);
+      return { success: false, error: result ? JSON.stringify(result) : '未知错误' };
     }
     
   } catch (error) {
