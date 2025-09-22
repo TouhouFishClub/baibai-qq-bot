@@ -30,6 +30,7 @@ async function handleDispatchEvent(payload, res) {
     try {
       // 根据不同的事件类型处理不同的逻辑
       switch (eventType) {
+        case EVENT_TYPE.AT_MESSAGE_CREATE:
         case EVENT_TYPE.GROUP_AT_MESSAGE_CREATE:
           // 处理群@消息
           await handleGroupAtMessage(eventData);
