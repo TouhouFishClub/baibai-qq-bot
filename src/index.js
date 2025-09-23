@@ -31,7 +31,27 @@ if (config.security.enableCors) {
   app.use(cors(corsOptions));
 }
 
-app.use(bodyParser.json());
+// 为webhook路由保存原始请求体
+app.use('/qq/webhook', (req, res, next) => {
+  let rawBody = '';
+  req.setEncoding('utf8');
+  req.on('data', (chunk) => {
+    rawBody += chunk;
+  });
+  req.on('end', () => {
+    req.rawBody = rawBody;
+    req.body = JSON.parse(rawBody);
+    next();
+  });
+});
+
+// 其他路由使用标准的body parser
+app.use((req, res, next) => {
+  if (req.path === '/qq/webhook') {
+    return next(); // webhook路由已经处理过了
+  }
+  bodyParser.json()(req, res, next);
+});
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // 静态文件服务
