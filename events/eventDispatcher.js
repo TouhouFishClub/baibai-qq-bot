@@ -4,6 +4,7 @@
  */
 
 const { handleGroupAtMessage } = require('../handlers/groupMessageHandler');
+const { handleChannelAtMessage } = require('../handlers/channelMessageHandler');
 const { OP_CODE, EVENT_TYPE } = require('../utils/constants');
 
 /**
@@ -31,6 +32,10 @@ async function handleDispatchEvent(payload, res) {
       // 根据不同的事件类型处理不同的逻辑
       switch (eventType) {
         case EVENT_TYPE.AT_MESSAGE_CREATE:
+          // 处理频道@消息
+          await handleChannelAtMessage(eventData);
+          break;
+          
         case EVENT_TYPE.GROUP_AT_MESSAGE_CREATE:
           // 处理群@消息
           await handleGroupAtMessage(eventData);

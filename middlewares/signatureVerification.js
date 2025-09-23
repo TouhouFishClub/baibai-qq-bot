@@ -40,11 +40,19 @@ const signatureMiddleware = (req, res, next) => {
     const body = JSON.stringify(req.body);
     const message = timestamp + body;
 
+    // 添加调试信息
+    console.log('签名验证调试信息:');
+    console.log('- 时间戳:', timestamp);
+    console.log('- 请求体长度:', body.length);
+    console.log('- 签名消息长度:', message.length);
+    console.log('- 收到的签名:', signature);
+
     // 验证签名
     const isValid = verifySignature(botSecret, message, signature);
 
     if (!isValid) {
       console.error('签名验证失败');
+      console.error('- 验证消息:', message.substring(0, 200) + (message.length > 200 ? '...' : ''));
       return res.status(401).json({ 
         error: '签名验证失败',
         details: '提供的签名验证失败'
