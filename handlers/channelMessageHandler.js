@@ -122,10 +122,16 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
       const imageUrl = `${serverHost}/temp_images/${fileName}`;
       
-      // 频道API直接使用图片URL，不需要先上传获取file_info
+      // 暂时先发送文本消息，调试认证问题
       if (responseData.message) {
-        // 发送带文本的图片消息
-        await sendImageToChannel(channelId, imageUrl, responseData.message, null, messageId);
+        console.log('临时方案：先发送文本消息，然后发送图片');
+        await sendTextToChannel(channelId, responseData.message, null, messageId);
+        // 然后尝试发送图片
+        try {
+          await sendImageToChannel(channelId, imageUrl, '', null, messageId);
+        } catch (imgError) {
+          console.error('发送图片失败，但文本已发送:', imgError.message);
+        }
       } else {
         // 只发送图片
         await sendImageToChannel(channelId, imageUrl, '', null, messageId);
@@ -186,7 +192,20 @@ async function getAccessToken() {
   }
 }
 
-// 注意：频道API使用image字段直接发送图片，支持同时发送文本和图片
+/**
+ * 发送图文混合消息到频道（已废弃，请使用sendImageToChannel）
+ * @param {string} channelId - 频道ID  
+ * @param {string} imageUrl - 图片URL（不再是fileInfo）
+ * @param {string} text - 文本内容
+ * @param {string} messageId - 回复的消息ID
+ */
+async function sendMediaWithTextToChannel(channelId, imageUrl, text, messageId) {
+  console.warn('sendMediaWithTextToChannel已废弃，建议使用sendImageToChannel');
+  
+  // 直接使用新的图片发送接口
+  const { sendImageToChannel } = require('../services/messageService');
+  return await sendImageToChannel(channelId, imageUrl, text, null, messageId);
+}
 
 /**
  * 调用外部OpenAPI接口
