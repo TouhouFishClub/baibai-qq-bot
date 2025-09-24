@@ -19,8 +19,12 @@ async function handleChannelAtMessage(eventData) {
     // 注意：频道消息的数据结构与群聊消息不同
     const { content, author, channel_id, guild_id, id: messageId } = eventData;
     
-    // 消息内容预处理（去除前后空格）
-    const trimmedContent = content.trim();
+    // 消息内容预处理（去除@机器人标记和前后空格）
+    // 频道消息格式：<@!927784118400615010> /meu 释魂 手里剑
+    let trimmedContent = content.trim();
+    
+    // 移除@机器人的标记（格式：<@!机器人ID>）
+    trimmedContent = trimmedContent.replace(/<@!\d+>\s*/g, '').trim();
     
     // 定义有效的命令前缀
     const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'mbtv', 'mbcd'];
@@ -154,6 +158,10 @@ async function uploadFileForChannel(channelId, url, fileType) {
     // 获取访问令牌
     const accessToken = await getAccessToken();
     
+    // 获取Bot认证信息
+    const appId = process.env.QQ_BOT_APP_ID;
+    const botAuth = `${appId}.${accessToken}`;
+    
     // 构建上传文件请求（频道API）
     const response = await axios.post(
       `${QQ_API_BASE_URL}/channels/${channelId}/files`,
@@ -165,7 +173,7 @@ async function uploadFileForChannel(channelId, url, fileType) {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bot ${accessToken}`
+          'Authorization': `Bot ${botAuth}`
         }
       }
     );
@@ -246,6 +254,10 @@ async function sendMediaWithTextToChannel(channelId, fileInfo, text, messageId) 
     // 获取访问令牌
     const accessToken = await getAccessToken();
     
+    // 获取Bot认证信息
+    const appId = process.env.QQ_BOT_APP_ID;
+    const botAuth = `${appId}.${accessToken}`;
+    
     // 构建图文混合消息（频道API）
     const message = {
       content: text, // 文本内容放在content中
@@ -263,7 +275,7 @@ async function sendMediaWithTextToChannel(channelId, fileInfo, text, messageId) 
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bot ${accessToken}`
+          'Authorization': `Bot ${botAuth}`
         }
       }
     );

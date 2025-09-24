@@ -229,14 +229,18 @@ async function sendChannelMessage(channelId, message, eventId = null, msgId = nu
       requestData.msg_seq = msgSeq;
     }
     
-    // 发送消息请求（注意：频道API使用Bot而不是QQBot）
+    // 获取Bot认证信息
+    const appId = process.env.QQ_BOT_APP_ID;
+    const botAuth = `${appId}.${accessToken}`;
+    
+    // 发送消息请求（注意：频道API使用Bot认证格式）
     const response = await axios.post(
       `${QQ_API_BASE_URL}/channels/${channelId}/messages`,
       requestData,
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bot ${accessToken}`
+          'Authorization': `Bot ${botAuth}`
         }
       }
     );
