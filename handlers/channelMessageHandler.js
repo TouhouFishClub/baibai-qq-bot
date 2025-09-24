@@ -30,6 +30,16 @@ async function handleChannelAtMessage(eventData) {
     // MESSAGE_CREATE格式：meu 释魂 手里剑
     let trimmedContent = content.trim();
     
+    // 检查是否包含@机器人标记
+    const containsAtBot = /<@!\d+>/.test(trimmedContent);
+    
+    // 如果是MESSAGE_CREATE事件且包含@机器人标记，则跳过处理
+    // 因为这种情况下也会收到AT_MESSAGE_CREATE事件，避免重复处理
+    if (containsAtBot) {
+      console.log('MESSAGE_CREATE事件包含@机器人标记，跳过处理（将由AT_MESSAGE_CREATE事件处理）');
+      return;
+    }
+    
     // 移除@机器人的标记（格式：<@!机器人ID>），如果存在的话
     trimmedContent = trimmedContent.replace(/<@!\d+>\s*/g, '').trim();
     
