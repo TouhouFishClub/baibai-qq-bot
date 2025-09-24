@@ -17,7 +17,13 @@ async function handleChannelAtMessage(eventData) {
     
     // 获取消息内容和相关信息
     // 注意：频道消息的数据结构与群聊消息不同
-    const { content, author, channel_id, guild_id, id: messageId } = eventData;
+    const { content, author, channel_id, guild_id, id: messageId, attachments } = eventData;
+    
+    // 检查是否有文本内容，如果没有则直接忽略
+    if (!content) {
+      console.log('收到无文本内容的消息（可能是图片、表情等），忽略处理');
+      return;
+    }
     
     // 消息内容预处理（去除@机器人标记和前后空格）
     // AT_MESSAGE_CREATE格式：<@!927784118400615010> /meu 释魂 手里剑
