@@ -11,7 +11,7 @@ const { sendTextToChannel, sendImageToChannel } = require('../services/messageSe
 /**
  * 处理频道@机器人消息
  */
-async function handleChannelAtMessage(eventData) {
+async function handleChannelAtMessage(eventData, eventType = null) {
   try {
     console.log('处理频道中@机器人消息:', eventData);
     
@@ -35,7 +35,7 @@ async function handleChannelAtMessage(eventData) {
     
     // 如果是MESSAGE_CREATE事件且包含@机器人标记，则跳过处理
     // 因为这种情况下也会收到AT_MESSAGE_CREATE事件，避免重复处理
-    if (containsAtBot) {
+    if (eventType === 'MESSAGE_CREATE' && containsAtBot) {
       console.log('MESSAGE_CREATE事件包含@机器人标记，跳过处理（将由AT_MESSAGE_CREATE事件处理）');
       return;
     }

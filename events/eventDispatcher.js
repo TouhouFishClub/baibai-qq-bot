@@ -33,12 +33,12 @@ async function handleDispatchEvent(payload, res) {
       switch (eventType) {
         case EVENT_TYPE.AT_MESSAGE_CREATE:
           // 处理频道@消息
-          await handleChannelAtMessage(eventData);
+          await handleChannelAtMessage(eventData, eventType);
           break;
           
         case EVENT_TYPE.MESSAGE_CREATE:
           // 处理频道普通消息（不需要@）
-          await handleChannelAtMessage(eventData);
+          await handleChannelAtMessage(eventData, eventType);
           break;
           
         case EVENT_TYPE.GROUP_AT_MESSAGE_CREATE:
