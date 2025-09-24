@@ -20,11 +20,14 @@ async function handleChannelAtMessage(eventData) {
     const { content, author, channel_id, guild_id, id: messageId } = eventData;
     
     // 消息内容预处理（去除@机器人标记和前后空格）
-    // 频道消息格式：<@!927784118400615010> /meu 释魂 手里剑
+    // AT_MESSAGE_CREATE格式：<@!927784118400615010> /meu 释魂 手里剑
+    // MESSAGE_CREATE格式：meu 释魂 手里剑
     let trimmedContent = content.trim();
     
-    // 移除@机器人的标记（格式：<@!机器人ID>）
+    // 移除@机器人的标记（格式：<@!机器人ID>），如果存在的话
     trimmedContent = trimmedContent.replace(/<@!\d+>\s*/g, '').trim();
+    
+    console.log('处理频道消息内容:', trimmedContent);
     
     // 定义有效的命令前缀
     const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'mbtv', 'mbcd'];

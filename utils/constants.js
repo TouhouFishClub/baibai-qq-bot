@@ -24,6 +24,7 @@ const EVENT_TYPE = {
   GUILD_MEMBER_ADD: 'GUILD_MEMBER_ADD',
   // ... 其他事件类型
   AT_MESSAGE_CREATE: 'AT_MESSAGE_CREATE',
+  MESSAGE_CREATE: 'MESSAGE_CREATE', // 频道普通消息事件
 };
 
 module.exports = {

@@ -36,6 +36,11 @@ async function handleDispatchEvent(payload, res) {
           await handleChannelAtMessage(eventData);
           break;
           
+        case EVENT_TYPE.MESSAGE_CREATE:
+          // 处理频道普通消息（不需要@）
+          await handleChannelAtMessage(eventData);
+          break;
+          
         case EVENT_TYPE.GROUP_AT_MESSAGE_CREATE:
           // 处理群@消息
           await handleGroupAtMessage(eventData);
