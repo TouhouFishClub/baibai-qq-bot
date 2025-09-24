@@ -103,8 +103,9 @@ async function sendReplyToGroup(responseData, groupOpenid, messageId) {
         fs.mkdirSync(tempImageDir, { recursive: true });
       }
       
-      // 获取文件名
-      const fileName = path.basename(responseData.path);
+      // 获取文件名并处理中文字符
+      const originalFileName = path.basename(responseData.path);
+      const fileName = originalFileName;
       const imagePath = path.join(tempImageDir, fileName);
       
       // 解码Base64并保存图片
@@ -113,9 +114,13 @@ async function sendReplyToGroup(responseData, groupOpenid, messageId) {
       
       console.log(`图片已保存至: ${imagePath}`);
       
-      // 获取绝对URL路径
+      // 获取绝对URL路径并进行URL编码
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
-      const imageUrl = `${serverHost}/temp_images/${fileName}`;
+      const encodedFileName = encodeURIComponent(fileName);
+      const imageUrl = `${serverHost}/temp_images/${encodedFileName}`;
+      
+      console.log(`原始文件名: ${originalFileName}`);
+      console.log(`编码后URL: ${imageUrl}`);
       
       // 调用QQ API上传图片，获取file_info
       const fileInfo = await uploadFileForGroup(groupOpenid, imageUrl, 1); // 1表示图片类型

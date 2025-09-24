@@ -82,13 +82,7 @@ async function handleChannelAtMessage(eventData) {
       }
     } else {
       console.log('收到非命令消息，忽略处理');
-      // 对非命令消息的回复
-      await sendTextToChannel(
-        channel_id, 
-        '我只能响应特定命令，可用的命令有：mbi, mbd, opt, meu, mbtv, mbcd',
-        null,
-        messageId
-      );
+      // 对于非命令消息，不发送任何回复，直接忽略
     }
   } catch (error) {
     console.error('处理频道@消息失败:', error);
@@ -111,8 +105,9 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
         fs.mkdirSync(tempImageDir, { recursive: true });
       }
       
-      // 获取文件名
-      const fileName = path.basename(responseData.path);
+      // 获取文件名并处理中文字符
+      const originalFileName = path.basename(responseData.path);
+      const fileName = originalFileName;
       const imagePath = path.join(tempImageDir, fileName);
       
       // 解码Base64并保存图片
@@ -121,9 +116,13 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       
       console.log(`图片已保存至: ${imagePath}`);
       
-      // 获取绝对URL路径
+      // 获取绝对URL路径并进行URL编码
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
-      const imageUrl = `${serverHost}/temp_images/${fileName}`;
+      const encodedFileName = encodeURIComponent(fileName);
+      const imageUrl = `${serverHost}/temp_images/${encodedFileName}`;
+      
+      console.log(`原始文件名: ${originalFileName}`);
+      console.log(`编码后URL: ${imageUrl}`);
       
       // 暂时先发送文本消息，调试认证问题
       if (responseData.message) {
