@@ -6,7 +6,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const { sendTextToChannel, sendMediaToChannel } = require('../services/messageService');
+const { sendTextToChannel, sendImageToChannel } = require('../services/messageService');
 
 /**
  * 处理频道@机器人消息
@@ -122,16 +122,13 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
       const imageUrl = `${serverHost}/temp_images/${fileName}`;
       
-      // 调用QQ API上传图片，获取file_info
-      const fileInfo = await uploadFileForChannel(channelId, imageUrl, 1); // 1表示图片类型
-      
-      // 如果有文本消息，使用图文混合消息
+      // 频道API直接使用图片URL，不需要先上传获取file_info
       if (responseData.message) {
-        // 构建图文混合消息
-        await sendMediaWithTextToChannel(channelId, fileInfo, responseData.message, messageId);
+        // 发送带文本的图片消息
+        await sendImageToChannel(channelId, imageUrl, responseData.message, null, messageId);
       } else {
-        // 只有图片，没有文本
-        await sendMediaToChannel(channelId, { file_info: fileInfo }, null, messageId);
+        // 只发送图片
+        await sendImageToChannel(channelId, imageUrl, '', null, messageId);
       }
       
     } else if (responseData.type === "text" && responseData.message) {
@@ -143,57 +140,7 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
   }
 }
 
-/**
- * 上传文件获取file_info（频道版本）
- * @param {string} channelId - 频道ID
- * @param {string} url - 文件URL
- * @param {number} fileType - 文件类型（1:图片, 2:视频, 3:语音, 4:文件）
- * @returns {Promise<string>} file_info
- */
-async function uploadFileForChannel(channelId, url, fileType) {
-  try {
-    const axios = require('axios');
-    const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
-    
-    // 获取访问令牌
-    const accessToken = await getAccessToken();
-    
-    // 获取Bot认证信息
-    const appId = process.env.QQ_BOT_APP_ID;
-    const botAuth = `${appId}.${accessToken}`;
-    
-    // 构建上传文件请求（频道API）
-    const response = await axios.post(
-      `${QQ_API_BASE_URL}/channels/${channelId}/files`,
-      {
-        file_type: fileType,
-        url: url,
-        srv_send_msg: false // 不直接发送，仅获取file_info
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bot ${botAuth}`
-        }
-      }
-    );
-    
-    if (!response.data || !response.data.file_info) {
-      throw new Error('上传文件失败，未获取到file_info: ' + JSON.stringify(response.data));
-    }
-    
-    console.log('文件上传成功，获取到file_info:', response.data);
-    return response.data.file_info;
-    
-  } catch (error) {
-    console.error('上传文件失败:', error.message);
-    if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
-    }
-    throw error;
-  }
-}
+// 注意：频道API不需要先上传文件获取file_info，直接使用图片URL即可
 
 /**
  * 获取访问令牌
@@ -239,58 +186,7 @@ async function getAccessToken() {
   }
 }
 
-/**
- * 发送图文混合消息到频道
- * @param {string} channelId - 频道ID
- * @param {string} fileInfo - 文件信息
- * @param {string} text - 文本内容
- * @param {string} messageId - 回复的消息ID
- */
-async function sendMediaWithTextToChannel(channelId, fileInfo, text, messageId) {
-  try {
-    const axios = require('axios');
-    const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
-    
-    // 获取访问令牌
-    const accessToken = await getAccessToken();
-    
-    // 获取Bot认证信息
-    const appId = process.env.QQ_BOT_APP_ID;
-    const botAuth = `${appId}.${accessToken}`;
-    
-    // 构建图文混合消息（频道API）
-    const message = {
-      content: text, // 文本内容放在content中
-      msg_type: 7,   // 富媒体消息类型
-      media: {
-        file_info: fileInfo
-      },
-      msg_id: messageId
-    };
-    
-    // 发送消息请求
-    const response = await axios.post(
-      `${QQ_API_BASE_URL}/channels/${channelId}/messages`,
-      message,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bot ${botAuth}`
-        }
-      }
-    );
-    
-    console.log('频道图文混合消息发送成功:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('发送频道图文混合消息失败:', error.message);
-    if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
-    }
-    throw error;
-  }
-}
+// 注意：频道API使用image字段直接发送图片，支持同时发送文本和图片
 
 /**
  * 调用外部OpenAPI接口
