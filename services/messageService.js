@@ -201,13 +201,8 @@ async function sendChannelMessage(channelId, messageData, eventId = null, msgId 
       throw new Error('缺少频道ID参数');
     }
     
-    // 获取Bot Token - 频道消息可能需要直接使用Bot Token
-    const botToken = process.env.QQ_BOT_TOKEN;
-    const appId = process.env.QQ_BOT_APP_ID;
-    
-    if (!botToken) {
-      throw new Error('未配置QQ_BOT_TOKEN环境变量');
-    }
+    // 获取动态AccessToken - 根据官方文档要求
+    const accessToken = await getAccessToken();
     
     // 构建请求数据
     const requestData = { ...messageData };
@@ -217,18 +212,17 @@ async function sendChannelMessage(channelId, messageData, eventId = null, msgId 
     if (msgId) requestData.msg_id = msgId;
     
     console.log('发送频道消息请求数据:', requestData);
-    console.log('AppId:', appId);
-    console.log('BotToken长度:', botToken.length);
-    console.log('使用认证格式: Bot', `${appId}.${botToken}`);
+    console.log('AccessToken长度:', accessToken.length);
+    console.log('使用认证格式: QQBot', accessToken);
     
-    // 发送消息请求 - 频道消息使用Bot {app_id}.{bot_token}格式
+    // 发送消息请求 - 根据官方文档，频道消息也使用QQBot认证格式
     const response = await axios.post(
       `${QQ_API_BASE_URL}/channels/${channelId}/messages`,
       requestData,
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bot ${appId}.${botToken}`
+          'Authorization': `QQBot ${accessToken}`
         }
       }
     );
