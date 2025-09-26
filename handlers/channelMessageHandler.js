@@ -46,7 +46,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     console.log('处理频道消息内容:', trimmedContent);
     
     // 定义有效的命令前缀
-    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'mbtv', 'mbcd'];
+    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'uni'];
     
     // 检查消息是否以有效前缀开头（不区分大小写）
     let isValidCommand = false;
@@ -226,6 +226,24 @@ async function sendMediaWithTextToChannel(channelId, imageUrl, text, messageId) 
 }
 
 /**
+ * 获取频道配置
+ * @returns {object} 频道配置对象
+ */
+function getChannelConfig() {
+  try {
+    const configPath = path.join(__dirname, '../config/channel.json');
+    const configData = fs.readFileSync(configPath, 'utf8');
+    return JSON.parse(configData);
+  } catch (error) {
+    console.error('读取频道配置文件失败:', error.message);
+    // 返回默认配置
+    return {
+      channel_exchange_group: '772195107'
+    };
+  }
+}
+
+/**
  * 调用外部OpenAPI接口
  * @param {string} command - 命令类型 (mbi, mbd, opt等)
  * @param {string} content - 实际内容
@@ -254,13 +272,21 @@ async function callOpenAPI(command, content, userId, guildId) {
     // 根据不同命令添加不同的参数
     switch (command) {
       case 'opt':
-      case 'mbtv':
-      case 'mbcd':
         params.from = userId;
         break;
       case 'meu':
         params.from = userId;
         params.groupid = guildId; // 对于频道，使用guild_id作为groupid
+        break;
+      case 'uni':
+        // 对于频道模式，使用channel_exchange_group作为group参数
+        const channelConfig = getChannelConfig();
+        params.group = channelConfig.channel_exchange_group;
+        params.from = userId;
+        // 默认用户名为 OPENAPI-用户ID
+        params.name = `OPENAPI-${userId}`;
+        // 默认群组名称为 OPENAPI-群组ID
+        params.groupName = `OPENAPI-${channelConfig.channel_exchange_group}`;
         break;
     }
     

@@ -46,6 +46,7 @@ public/temp_images/
 
 # 群组配置文件
 config/groups.json
+config/channel.json
 
 # 推送系统配置文件和数据文件（忽略实际配置文件，保留示例文件）
 data/push_configs.json

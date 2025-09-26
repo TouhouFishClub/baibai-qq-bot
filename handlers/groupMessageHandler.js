@@ -22,7 +22,7 @@ async function handleGroupAtMessage(eventData) {
     const trimmedContent = content.trim();
     
     // 定义有效的命令前缀
-    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'mbtv', 'mbcd'];
+    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'uni'];
     
     // 检查消息是否以有效前缀开头（不区分大小写）
     let isValidCommand = false;
@@ -77,7 +77,7 @@ async function handleGroupAtMessage(eventData) {
       // 对非命令消息的回复
       await sendTextToGroup(
         group_openid, 
-        '我只能响应特定命令，可用的命令有：mbi, mbd, opt, meu, mbtv, mbcd',
+        '我只能响应特定命令，可用的命令有：mbi, mbd, opt, meu, uni',
         null,
         messageId
       );
@@ -313,13 +313,19 @@ async function callOpenAPI(command, content, userId, groupId) {
     // 根据不同命令添加不同的参数
     switch (command) {
       case 'opt':
-      case 'mbtv':
-      case 'mbcd':
         params.from = userId;
         break;
       case 'meu':
         params.from = userId;
         params.groupid = groupId;
+        break;
+      case 'uni':
+        params.group = groupId;
+        params.from = userId;
+        // 默认用户名为 OPENAPI-用户ID
+        params.name = `OPENAPI-${userId}`;
+        // 默认群组名称为 OPENAPI-群组ID
+        params.groupName = `OPENAPI-${groupId}`;
         break;
     }
     
