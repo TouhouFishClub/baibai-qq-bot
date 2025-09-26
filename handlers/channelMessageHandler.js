@@ -99,6 +99,25 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     } else {
       console.log('收到未匹配命令的消息，使用uni接口处理');
       
+      // 检查是否包含管道符号，如果包含则需要管理员权限
+      if (trimmedContent.includes('|')) {
+        const channelConfig = getChannelConfig();
+        const adminUserId = channelConfig.admin_user;
+        
+        if (author.id !== adminUserId) {
+          console.log(`用户 ${author.id} 尝试使用管理员功能（包含|），但不是管理员 ${adminUserId}`);
+          await sendTextToChannel(
+            channel_id, 
+            '此功能仅限管理员使用',
+            null,
+            messageId
+          );
+          return;
+        }
+        
+        console.log(`管理员 ${author.id} 使用包含|的uni命令`);
+      }
+      
       // 未匹配到特定命令的消息都通过uni接口处理
       const apiResponse = await callOpenAPI('uni', trimmedContent, author.id, guild_id);
       
