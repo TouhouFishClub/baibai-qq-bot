@@ -169,7 +169,9 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       // 暂时先发送文本消息，调试认证问题
       if (responseData.message) {
         console.log('临时方案：先发送文本消息，然后发送图片');
-        await sendTextToChannel(channelId, responseData.message, null, messageId);
+        // 转换CQ码格式
+        const convertedMessage = convertCQCodeToQQFormat(responseData.message);
+        await sendTextToChannel(channelId, convertedMessage, null, messageId);
         // 然后尝试发送图片
         try {
           await sendImageToChannel(channelId, imageUrl, '', null, messageId);
@@ -183,7 +185,9 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       
     } else if (responseData.type === "text" && responseData.message) {
       // 处理文本消息
-      await sendTextToChannel(channelId, responseData.message, null, messageId);
+      // 转换CQ码格式
+      const convertedMessage = convertCQCodeToQQFormat(responseData.message);
+      await sendTextToChannel(channelId, convertedMessage, null, messageId);
     }
   } catch (error) {
     console.error('发送频道回复失败:', error);
@@ -249,6 +253,28 @@ async function sendMediaWithTextToChannel(channelId, imageUrl, text, messageId) 
   // 直接使用新的图片发送接口
   const { sendImageToChannel } = require('../services/messageService');
   return await sendImageToChannel(channelId, imageUrl, text, null, messageId);
+}
+
+/**
+ * 将CQ码格式转换为QQ机器人API格式
+ * @param {string} message - 包含CQ码的消息
+ * @returns {string} 转换后的消息
+ */
+function convertCQCodeToQQFormat(message) {
+  if (!message || typeof message !== 'string') {
+    return message;
+  }
+  
+  // 将 [CQ:at,qq=用户ID] 转换为 <@!用户ID>
+  // 使用 <@!user_id> 格式（带感叹号的版本）
+  const atRegex = /\[CQ:at,qq=(\d+)\]/g;
+  const convertedMessage = message.replace(atRegex, '<@!$1>');
+  
+  if (convertedMessage !== message) {
+    console.log(`CQ码转换: "${message}" -> "${convertedMessage}"`);
+  }
+  
+  return convertedMessage;
 }
 
 /**
