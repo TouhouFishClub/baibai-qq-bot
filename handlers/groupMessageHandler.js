@@ -21,8 +21,8 @@ async function handleGroupAtMessage(eventData) {
     // 消息内容预处理（去除前后空格）
     const trimmedContent = content.trim();
     
-    // 定义有效的命令前缀
-    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'uni'];
+    // 定义有效的命令前缀（不包含uni，uni作为默认处理）
+    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu'];
     
     // 检查消息是否以有效前缀开头（不区分大小写）
     let isValidCommand = false;
@@ -73,14 +73,15 @@ async function handleGroupAtMessage(eventData) {
         await sendReplyToGroup(apiResponse.data, group_openid, messageId);
       }
     } else {
-      console.log('收到非命令消息，忽略处理');
-      // 对非命令消息的回复
-      await sendTextToGroup(
-        group_openid, 
-        '我只能响应特定命令，可用的命令有：mbi, mbd, opt, meu, uni',
-        null,
-        messageId
-      );
+      console.log('收到未匹配命令的消息，使用uni接口处理');
+      
+      // 未匹配到特定命令的消息都通过uni接口处理
+      const apiResponse = await callOpenAPI('uni', trimmedContent, author.id, group_id);
+      
+      // 发送回复
+      if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
+        await sendReplyToGroup(apiResponse.data, group_openid, messageId);
+      }
     }
   } catch (error) {
     console.error('处理群聊@消息失败:', error);

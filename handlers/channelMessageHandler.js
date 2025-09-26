@@ -45,8 +45,8 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     
     console.log('处理频道消息内容:', trimmedContent);
     
-    // 定义有效的命令前缀
-    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'uni'];
+    // 定义有效的命令前缀（不包含uni，uni作为默认处理）
+    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu'];
     
     // 检查消息是否以有效前缀开头（不区分大小写）
     let isValidCommand = false;
@@ -97,8 +97,15 @@ async function handleChannelAtMessage(eventData, eventType = null) {
         await sendReplyToChannel(apiResponse.data, channel_id, messageId);
       }
     } else {
-      console.log('收到非命令消息，忽略处理');
-      // 对于非命令消息，不发送任何回复，直接忽略
+      console.log('收到未匹配命令的消息，使用uni接口处理');
+      
+      // 未匹配到特定命令的消息都通过uni接口处理
+      const apiResponse = await callOpenAPI('uni', trimmedContent, author.id, guild_id);
+      
+      // 发送回复
+      if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
+        await sendReplyToChannel(apiResponse.data, channel_id, messageId);
+      }
     }
   } catch (error) {
     console.error('处理频道@消息失败:', error);
