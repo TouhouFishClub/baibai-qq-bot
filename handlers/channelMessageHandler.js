@@ -17,7 +17,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     
     // 获取消息内容和相关信息
     // 注意：频道消息的数据结构与群聊消息不同
-    const { content, author, channel_id, guild_id, id: messageId, attachments } = eventData;
+    const { content, author, member, channel_id, guild_id, id: messageId, attachments } = eventData;
     
     // 检查是否有文本内容，如果没有则直接忽略
     if (!content) {
@@ -90,7 +90,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
       console.log(`命令内容: ${actualContent}`);
       
       // 构建API请求
-      const apiResponse = await callOpenAPI(commandPrefix, actualContent, author.id, guild_id);
+      const apiResponse = await callOpenAPI(commandPrefix, actualContent, author, member, guild_id);
       
       // 发送回复
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
@@ -119,7 +119,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
       }
       
       // 未匹配到特定命令的消息都通过uni接口处理
-      const apiResponse = await callOpenAPI('uni', trimmedContent, author.id, guild_id);
+      const apiResponse = await callOpenAPI('uni', trimmedContent, author, member, guild_id);
       
       // 发送回复
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
@@ -299,10 +299,11 @@ function getChannelConfig() {
  * 调用外部OpenAPI接口
  * @param {string} command - 命令类型 (mbi, mbd, opt等)
  * @param {string} content - 实际内容
- * @param {string} userId - 用户ID
+ * @param {object} author - 用户信息对象
+ * @param {object} member - 成员信息对象
  * @param {string} guildId - 服务器ID（频道所属的服务器）
  */
-async function callOpenAPI(command, content, userId, guildId) {
+async function callOpenAPI(command, content, author, member, guildId) {
   try {
     if (!content) {
       console.log(`命令 ${command} 内容为空，不执行API调用`);
@@ -324,19 +325,21 @@ async function callOpenAPI(command, content, userId, guildId) {
     // 根据不同命令添加不同的参数
     switch (command) {
       case 'opt':
-        params.from = userId;
+        params.from = author.id;
         break;
       case 'meu':
-        params.from = userId;
+        params.from = author.id;
         params.groupid = guildId; // 对于频道，使用guild_id作为groupid
         break;
       case 'uni':
         // 对于频道模式，使用channel_exchange_group作为group参数
         const channelConfig = getChannelConfig();
         params.group = channelConfig.channel_exchange_group;
-        params.from = userId;
-        // 默认用户名为 OPENAPI-用户ID
-        params.name = `OPENAPI-${userId}`;
+        params.from = author.id;
+        // 在频道模式下，使用 username || member.nick 作为用户名
+        const userName = author.username || (member && member.nick) || `OPENAPI-${author.id}`;
+        params.name = userName;
+        console.log(`频道模式用户名设置: author.username="${author.username}", member.nick="${member && member.nick}", 最终使用: "${userName}"`);
         // 默认群组名称为 OPENAPI-群组ID
         params.groupName = `OPENAPI-${channelConfig.channel_exchange_group}`;
         break;
