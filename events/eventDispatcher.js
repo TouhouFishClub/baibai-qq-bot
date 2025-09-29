@@ -5,6 +5,7 @@
 
 const { handleGroupAtMessage } = require('../handlers/groupMessageHandler');
 const { handleChannelAtMessage } = require('../handlers/channelMessageHandler');
+const { handleC2CMessage, handleDirectMessage } = require('../handlers/directMessageHandler');
 const { OP_CODE, EVENT_TYPE } = require('../utils/constants');
 
 /**
@@ -46,10 +47,15 @@ async function handleDispatchEvent(payload, res) {
           await handleGroupAtMessage(eventData);
           break;
           
-        // TODO: 添加其他事件类型的处理
-        // case EVENT_TYPE.DIRECT_MESSAGE_CREATE:
-        //   await handleDirectMessage(eventData);
-        //   break;
+        case EVENT_TYPE.C2C_MESSAGE_CREATE:
+          // 处理QQ私信消息
+          await handleC2CMessage(eventData);
+          break;
+          
+        case EVENT_TYPE.DIRECT_MESSAGE_CREATE:
+          // 处理频道私信消息
+          await handleDirectMessage(eventData);
+          break;
           
         default:
           console.log(`未处理的事件类型: ${eventType}`);

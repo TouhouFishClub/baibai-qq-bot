@@ -59,9 +59,9 @@ const signatureMiddleware = (req, res, next) => {
       console.error('签名验证失败');
       console.error('- 验证消息:', message.substring(0, 200) + (message.length > 200 ? '...' : ''));
       
-      // 如果是频道事件，暂时跳过签名验证失败的阻止
-      if (eventType === 'AT_MESSAGE_CREATE') {
-        console.warn('警告: AT_MESSAGE_CREATE事件签名验证失败，但继续处理（临时解决方案）');
+      // 如果是频道事件或私信事件，暂时跳过签名验证失败的阻止
+      if (eventType === 'AT_MESSAGE_CREATE' || eventType === 'C2C_MESSAGE_CREATE' || eventType === 'DIRECT_MESSAGE_CREATE') {
+        console.warn(`警告: ${eventType}事件签名验证失败，但继续处理（临时解决方案）`);
         next();
         return;
       }

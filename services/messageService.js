@@ -317,6 +317,164 @@ async function sendMediaToChannel(channelId, media, eventId = null, msgId = null
   throw new Error('频道发送富媒体请使用sendImageToChannel，传入图片URL');
 }
 
+/**
+ * 发送QQ单聊消息
+ * @param {string} userOpenid - 用户的openid
+ * @param {object} message - 消息内容
+ * @param {string} [eventId] - 前置收到的事件ID (可选)
+ * @param {string} [msgId] - 前置收到的用户消息ID (可选)
+ * @param {number} [msgSeq=1] - 回复消息的序号 (可选)
+ * @returns {Promise<object>} 发送结果
+ */
+async function sendC2CMessage(userOpenid, message, eventId = null, msgId = null, msgSeq = 1) {
+  try {
+    if (!userOpenid) {
+      throw new Error('缺少用户openid参数');
+    }
+    
+    if (!message || !message.content) {
+      throw new Error('消息内容不能为空');
+    }
+    
+    // 确保msg_type有效
+    if (message.msg_type === undefined) {
+      message.msg_type = 0; // 默认为文本消息
+    }
+    
+    // 富媒体消息类型需要特殊处理
+    if (message.msg_type === 7 && message.content.trim() === '') {
+      message.content = ' '; // 富媒体消息content需要有值
+    }
+    
+    // 获取访问令牌
+    const accessToken = await getAccessToken();
+    
+    // 构建请求数据
+    const requestData = { ...message };
+    
+    // 添加可选字段
+    if (eventId) requestData.event_id = eventId;
+    if (msgId) {
+      requestData.msg_id = msgId;
+      requestData.msg_seq = msgSeq;
+    }
+    
+    // 发送消息请求 - 根据官方文档使用v2/users/{openid}/messages
+    const response = await axios.post(
+      `${QQ_API_BASE_URL}/v2/users/${userOpenid}/messages`,
+      requestData,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `QQBot ${accessToken}`
+        }
+      }
+    );
+    
+    console.log('QQ单聊消息发送成功:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('发送QQ单聊消息错误:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 发送文本消息到QQ单聊
+ * @param {string} userOpenid - 用户的openid
+ * @param {string} content - 文本内容
+ * @param {string} [eventId] - 前置事件ID (可选)
+ * @param {string} [msgId] - 前置消息ID (可选)
+ * @returns {Promise<object>} 发送结果
+ */
+async function sendTextToC2C(userOpenid, content, eventId = null, msgId = null) {
+  return sendC2CMessage(
+    userOpenid,
+    {
+      content,
+      msg_type: 0 // 文本消息
+    },
+    eventId,
+    msgId
+  );
+}
+
+/**
+ * 发送频道私信消息
+ * @param {string} guildId - 频道服务器ID
+ * @param {object} messageData - 消息数据
+ * @param {string} [eventId] - 前置收到的事件ID (可选)
+ * @param {string} [msgId] - 前置收到的用户消息ID (可选)
+ * @returns {Promise<object>} 发送结果
+ */
+async function sendDirectMessage(guildId, messageData, eventId = null, msgId = null) {
+  try {
+    if (!guildId) {
+      throw new Error('缺少频道服务器ID参数');
+    }
+    
+    // 获取动态AccessToken
+    const accessToken = await getAccessToken();
+    
+    // 构建请求数据
+    const requestData = { ...messageData };
+    
+    // 添加被动消息字段
+    if (eventId) requestData.event_id = eventId;
+    if (msgId) requestData.msg_id = msgId;
+    
+    console.log('发送频道私信消息请求数据:', requestData);
+    console.log('使用认证格式: QQBot', accessToken);
+    
+    // 发送消息请求 - 根据官方文档使用/dms/{guild_id}/messages
+    const response = await axios.post(
+      `${QQ_API_BASE_URL}/dms/${guildId}/messages`,
+      requestData,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `QQBot ${accessToken}`
+        }
+      }
+    );
+    
+    console.log('频道私信消息发送成功:', response.data);
+    return response.data;
+    
+  } catch (error) {
+    console.error('发送频道私信消息错误:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 发送文本消息到频道私信
+ * @param {string} guildId - 频道服务器ID
+ * @param {string} content - 文本内容
+ * @param {string} [eventId] - 前置事件ID (可选)
+ * @param {string} [msgId] - 前置消息ID (可选)
+ * @returns {Promise<object>} 发送结果
+ */
+async function sendTextToDirectMessage(guildId, content, eventId = null, msgId = null) {
+  return sendDirectMessage(
+    guildId,
+    {
+      content // 频道私信API直接使用content字段，类似频道消息
+    },
+    eventId,
+    msgId
+  );
+}
+
 module.exports = {
   sendGroupMessage,
   sendTextToGroup,
@@ -326,5 +484,9 @@ module.exports = {
   sendTextToChannel,
   sendMarkdownToChannel,
   sendImageToChannel,
-  sendMediaToChannel
+  sendMediaToChannel,
+  sendC2CMessage,
+  sendTextToC2C,
+  sendDirectMessage,
+  sendTextToDirectMessage
 }; 
