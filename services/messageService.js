@@ -488,5 +488,6 @@ module.exports = {
   sendC2CMessage,
   sendTextToC2C,
   sendDirectMessage,
-  sendTextToDirectMessage
+  sendTextToDirectMessage,
+  getAccessToken
 }; 
