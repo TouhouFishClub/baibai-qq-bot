@@ -23,22 +23,25 @@ try {
  * 图片压缩配置 - 优化为高质量保真压缩
  */
 const COMPRESSION_CONFIG = {
-  // 最大文件大小 (字节) - 降低到3MB，确保上传成功
-  MAX_FILE_SIZE: 3 * 1024 * 1024,
-  // 最大宽度 - 2048px (更保守)
-  MAX_WIDTH: 2048,
-  // 最大高度 - 15000px (支持长截图但更保守)
-  MAX_HEIGHT: 15000,
-  // 最大总像素数 - 2000万像素 (大幅降低)
-  MAX_TOTAL_PIXELS: 20 * 1024 * 1024,
-  // 长宽比限制 - 最大20:1 (更保守)
-  MAX_ASPECT_RATIO: 20,
-  // JPEG质量 (1-100)
-  JPEG_QUALITY: 95,
-  // PNG压缩级别 (0-9)
-  PNG_COMPRESSION: 6,
-  // WebP质量 (1-100)
-  WEBP_QUALITY: 95,
+  // 目标文件大小 - 1MB以下
+  TARGET_FILE_SIZE: 0.9 * 1024 * 1024,  // 0.9MB目标
+  MAX_FILE_SIZE: 1 * 1024 * 1024,       // 1MB硬限制
+  // 最大宽度 - 1920px (平衡质量和大小)
+  MAX_WIDTH: 1920,
+  // 最大高度 - 12000px (支持长截图)
+  MAX_HEIGHT: 12000,
+  // 最大总像素数 - 800万像素 (大幅优化)
+  MAX_TOTAL_PIXELS: 8 * 1024 * 1024,
+  // 长宽比限制 - 最大15:1 
+  MAX_ASPECT_RATIO: 15,
+  // JPEG质量 - 动态调整
+  JPEG_QUALITY_HIGH: 85,      // 高质量
+  JPEG_QUALITY_MEDIUM: 75,    // 中等质量  
+  JPEG_QUALITY_LOW: 65,       // 低质量（保底）
+  // PNG压缩级别
+  PNG_COMPRESSION: 9,         // 最高压缩
+  // WebP质量
+  WEBP_QUALITY: 80,
   // 启用渐进式JPEG
   PROGRESSIVE_JPEG: true,
   // PNG优化选项
@@ -60,15 +63,21 @@ async function needsCompression(filePath) {
     
     console.log(`图片文件大小: ${fileSizeMB.toFixed(2)}MB`);
     
-    // 文件大小检查 - 更严格的限制
+    // 激进的文件大小检查 - 目标1MB以下
     if (fileSizeBytes > COMPRESSION_CONFIG.MAX_FILE_SIZE) {
-      console.log(`图片过大 (${fileSizeMB.toFixed(2)}MB > ${COMPRESSION_CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB)，需要压缩`);
+      console.log(`图片超过1MB限制 (${fileSizeMB.toFixed(2)}MB > 1MB)，强制压缩`);
       return true;
     }
     
-    // 对于中等大小文件也进行检查，确保上传成功
-    if (fileSizeMB > 2.5) {
-      console.log(`图片较大 (${fileSizeMB.toFixed(2)}MB > 2.5MB)，预防性压缩`);
+    // 对于接近1MB的文件也进行优化
+    if (fileSizeMB > 0.8) {
+      console.log(`图片接近1MB (${fileSizeMB.toFixed(2)}MB > 0.8MB)，预防性压缩到1MB以下`);
+      return true;
+    }
+    
+    // 对于中等大小文件也检查像素数
+    if (fileSizeMB > 0.5) {
+      console.log(`图片需要优化 (${fileSizeMB.toFixed(2)}MB > 0.5MB)，检查是否可以进一步压缩`);
       return true;
     }
     
@@ -123,34 +132,43 @@ async function needsCompression(filePath) {
 }
 
 /**
- * 根据原始文件大小动态调整压缩质量
+ * 根据原始文件大小和目标大小动态调整压缩质量
  * @param {number} originalSizeMB - 原始文件大小(MB)
  * @param {string} format - 图片格式
+ * @param {number} targetPixels - 目标像素数
  * @returns {object} 动态压缩配置
  */
-function getDynamicCompressionConfig(originalSizeMB, format) {
-  let quality = COMPRESSION_CONFIG.JPEG_QUALITY;
-  let compressionLevel = COMPRESSION_CONFIG.PNG_COMPRESSION;
+function getDynamicCompressionConfig(originalSizeMB, format, targetPixels) {
+  let quality, compressionLevel;
   
-  if (originalSizeMB <= 2) {
-    // 小文件：几乎无损
-    quality = 98;
-    compressionLevel = 3;
-  } else if (originalSizeMB <= 5) {
-    // 中等文件：高质量
-    quality = 95;
-    compressionLevel = 5;
-  } else if (originalSizeMB <= 10) {
-    // 大文件：平衡质量和大小
-    quality = 90;
+  // 根据原始大小和压缩需求动态调整
+  const compressionRatio = originalSizeMB / 0.9; // 目标0.9MB
+  
+  if (compressionRatio <= 1.5) {
+    // 轻度压缩：保持高质量
+    quality = COMPRESSION_CONFIG.JPEG_QUALITY_HIGH;
     compressionLevel = 6;
+  } else if (compressionRatio <= 3) {
+    // 中度压缩：平衡质量和大小
+    quality = COMPRESSION_CONFIG.JPEG_QUALITY_MEDIUM;
+    compressionLevel = 8;
+  } else if (compressionRatio <= 6) {
+    // 重度压缩：优先大小
+    quality = COMPRESSION_CONFIG.JPEG_QUALITY_LOW;
+    compressionLevel = 9;
   } else {
-    // 超大文件：适度压缩
-    quality = 85;
-    compressionLevel = 7;
+    // 极重压缩：保底设置
+    quality = 55;
+    compressionLevel = 9;
   }
   
-  console.log(`动态质量设置: ${originalSizeMB.toFixed(1)}MB -> ${format}质量${quality}`);
+  // 对于长条图，适当提高质量以保持可读性
+  if (targetPixels && targetPixels > 5 * 1024 * 1024) {
+    quality = Math.min(quality + 10, 90);
+    console.log(`长条图质量补偿: 质量提升到${quality}`);
+  }
+  
+  console.log(`智能质量设置: ${originalSizeMB.toFixed(1)}MB (压缩比${compressionRatio.toFixed(1)}x) -> ${format}质量${quality}`);
   
   return { quality, compressionLevel };
 }
@@ -180,7 +198,8 @@ async function compressImage(inputPath, outputPath) {
     console.log(`原始图片信息: ${metadata.width}x${metadata.height}, 格式: ${metadata.format}, 大小: ${originalSizeMB.toFixed(2)}MB`);
     
     // 获取动态压缩配置
-    const dynamicConfig = getDynamicCompressionConfig(originalSizeMB, metadata.format);
+    const targetPixels = metadata.width * metadata.height;
+    const dynamicConfig = getDynamicCompressionConfig(originalSizeMB, metadata.format, targetPixels);
     
     let pipeline = image;
     
@@ -212,15 +231,28 @@ async function compressImage(inputPath, outputPath) {
       newHeight = Math.round(metadata.height * ratio);
       console.log(`基于尺寸限制缩放: 比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
-    // 策略2.5: 长条图特殊处理 - 确保上传成功
-    else if (metadata.height > 10000 && originalSizeMB > 2.5) {
+    // 策略2.5: 长条图特殊处理 - 激进压缩到1MB以下
+    else if (metadata.height > 8000 && originalSizeMB > 0.8) {
       needResize = true;
-      // 对于长条图，适度缩小以确保上传成功
-      const targetPixels = 15 * 1024 * 1024; // 目标1500万像素
+      // 对于长条图，激进缩小以确保1MB以下
+      const targetPixels = Math.min(6 * 1024 * 1024, COMPRESSION_CONFIG.MAX_TOTAL_PIXELS); // 目标600万像素
       const pixelRatio = Math.sqrt(targetPixels / totalPixels);
       newWidth = Math.round(metadata.width * pixelRatio);
       newHeight = Math.round(metadata.height * pixelRatio);
-      console.log(`长条图特殊优化: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight} (确保上传成功)`);
+      console.log(`长条图激进优化: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight} (目标1MB以下)`);
+    }
+    // 策略2.6: 对于所有需要压缩到1MB以下的图片
+    else if (originalSizeMB > 1.0) {
+      needResize = true;
+      // 根据文件大小估算需要的像素减少比例
+      const sizeRatio = 0.9 / originalSizeMB; // 目标0.9MB
+      const estimatedPixelRatio = Math.sqrt(sizeRatio * 0.7); // 保守估计
+      const targetPixels = Math.round(totalPixels * estimatedPixelRatio);
+      const pixelRatio = Math.sqrt(targetPixels / totalPixels);
+      
+      newWidth = Math.round(metadata.width * pixelRatio);
+      newHeight = Math.round(metadata.height * pixelRatio);
+      console.log(`激进压缩优化: 目标${targetPixels/1024/1024}M像素, 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
     // 策略3: 极端长宽比处理
     else if (aspectRatio > COMPRESSION_CONFIG.MAX_ASPECT_RATIO) {
@@ -348,41 +380,66 @@ async function compressImage(inputPath, outputPath) {
     
     console.log(`图片压缩完成: ${compressedSizeMB.toFixed(2)}MB (压缩率: ${compressionRatio}%)`);
     
-    // 检查压缩后的文件大小是否仍然过大
-    if (compressedSizeMB > 4) {
-      console.warn(`警告: 压缩后文件仍较大 (${compressedSizeMB.toFixed(2)}MB)，可能影响上传成功率`);
-    }
-    
-    // 如果压缩后仍然超过5MB，进行二次压缩
-    if (compressedSizeMB > 5) {
-      console.log(`文件过大，进行二次压缩...`);
-      try {
-        const secondaryImage = sharp(outputPath);
-        const secondaryMeta = await secondaryImage.metadata();
+    // 激进的文件大小检查 - 目标1MB以下
+    if (compressedSizeMB > 1.0) {
+      console.log(`文件仍超过1MB (${compressedSizeMB.toFixed(2)}MB)，启动激进二次压缩...`);
+      
+      let attempts = 0;
+      let currentSize = compressedSizeMB;
+      
+      while (currentSize > 1.0 && attempts < 3) {
+        attempts++;
+        console.log(`第${attempts}次激进压缩 (当前${currentSize.toFixed(2)}MB)...`);
         
-        // 进一步缩小
-        const furtherRatio = Math.sqrt(3 / compressedSizeMB); // 目标3MB
-        const finalWidth = Math.round(secondaryMeta.width * furtherRatio);
-        const finalHeight = Math.round(secondaryMeta.height * furtherRatio);
-        
-        await secondaryImage
-          .resize(finalWidth, finalHeight, {
-            fit: 'inside',
-            withoutEnlargement: true,
-            kernel: sharp.kernel.lanczos3
-          })
-          .jpeg({ quality: 80, progressive: true, mozjpeg: true })
-          .toFile(outputPath + '.temp');
+        try {
+          const secondaryImage = sharp(outputPath);
+          const secondaryMeta = await secondaryImage.metadata();
           
-        // 替换原文件
-        fs.renameSync(outputPath + '.temp', outputPath);
-        
-        const finalSize = fs.statSync(outputPath).size / 1024 / 1024;
-        console.log(`二次压缩完成: ${finalSize.toFixed(2)}MB`);
-        
-      } catch (secondaryError) {
-        console.error('二次压缩失败:', secondaryError.message);
+          // 计算需要的压缩比例
+          const targetSizeMB = 0.8; // 目标0.8MB，留有余量
+          const sizeReductionRatio = targetSizeMB / currentSize;
+          const pixelReductionRatio = Math.sqrt(sizeReductionRatio * 0.6); // 保守估计
+          
+          const finalWidth = Math.max(200, Math.round(secondaryMeta.width * pixelReductionRatio));
+          const finalHeight = Math.max(200, Math.round(secondaryMeta.height * pixelReductionRatio));
+          
+          // 动态调整质量
+          let quality = 70 - (attempts - 1) * 10; // 70, 60, 50
+          quality = Math.max(quality, 45); // 最低45质量
+          
+          await secondaryImage
+            .resize(finalWidth, finalHeight, {
+              fit: 'inside',
+              withoutEnlargement: true,
+              kernel: sharp.kernel.lanczos3
+            })
+            .jpeg({ 
+              quality: quality, 
+              progressive: true, 
+              mozjpeg: true,
+              chromaSubsampling: '4:2:0' // 使用标准子采样以减小文件
+            })
+            .toFile(outputPath + '.temp');
+            
+          // 替换原文件
+          fs.renameSync(outputPath + '.temp', outputPath);
+          
+          currentSize = fs.statSync(outputPath).size / 1024 / 1024;
+          console.log(`第${attempts}次压缩完成: ${finalWidth}x${finalHeight}, 质量${quality}, 大小${currentSize.toFixed(2)}MB`);
+          
+        } catch (secondaryError) {
+          console.error(`第${attempts}次压缩失败:`, secondaryError.message);
+          break;
+        }
       }
+      
+      if (currentSize > 1.0) {
+        console.warn(`警告: 经过${attempts}次压缩，文件仍为${currentSize.toFixed(2)}MB，可能影响上传`);
+      } else {
+        console.log(`✅ 成功压缩到1MB以下: ${currentSize.toFixed(2)}MB`);
+      }
+    } else {
+      console.log(`✅ 压缩成功，文件大小: ${compressedSizeMB.toFixed(2)}MB (< 1MB)`);
     }
     
     return true;
@@ -500,3 +557,4 @@ module.exports = {
   getImageInfo,
   COMPRESSION_CONFIG
 };
+
