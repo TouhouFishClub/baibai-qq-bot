@@ -116,9 +116,8 @@ async function handleC2CMessage(eventData) {
       // 发送回复 - 使用原始消息ID作为被动消息
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
         await sendReplyToC2C(apiResponse.data, userId, messageId);
-      } else {
-        await sendTextToC2C(userId, '处理完成，但没有返回结果', null, messageId);
       }
+      // 如果没有返回结果，静默处理，不发送回复
     } catch (apiError) {
       console.error('调用OpenAPI错误:', apiError);
       await sendTextToC2C(userId, '处理请求时发生错误，请稍后再试', null, messageId);
@@ -202,14 +201,13 @@ async function handleDirectMessage(eventData) {
     
     // 调用openapi处理命令
     try {
-      const apiResponse = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
+      const apiResponse = await callOpenAPI(commandPrefix, actualContent, userId, groupId, author.username);
       
       // 发送回复 - 使用原始消息ID作为被动消息
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
         await sendReplyToDirectMessage(apiResponse.data, guild_id, messageId);
-      } else {
-        await sendTextToDirectMessage(guild_id, '处理完成，但没有返回结果', null, messageId);
       }
+      // 如果没有返回结果，静默处理，不发送回复
     } catch (apiError) {
       console.error('调用OpenAPI错误:', apiError);
       await sendTextToDirectMessage(guild_id, '处理请求时发生错误，请稍后再试', null, messageId);
@@ -226,9 +224,10 @@ async function handleDirectMessage(eventData) {
  * @param {string} content - 命令内容
  * @param {string} userId - 用户ID
  * @param {string} groupId - 群组ID
+ * @param {string} [userName] - 用户名 (可选)
  * @returns {Promise<string>} API返回结果
  */
-async function callOpenAPI(command, content, userId, groupId) {
+async function callOpenAPI(command, content, userId, groupId, userName = null) {
   try {
     if (!content) {
       console.log(`命令 ${command} 内容为空，不执行API调用`);
@@ -259,8 +258,8 @@ async function callOpenAPI(command, content, userId, groupId) {
       case 'uni':
         params.group = groupId;
         params.from = userId;
-        // 默认用户名为 OPENAPI-用户ID
-        params.name = `OPENAPI-${userId}`;
+        // 使用传入的用户名，如果没有则使用默认格式
+        params.name = userName || `OPENAPI-${userId}`;
         // 默认群组名称为 OPENAPI-群组ID
         params.groupName = `OPENAPI-${groupId}`;
         break;
@@ -282,6 +281,18 @@ async function callOpenAPI(command, content, userId, groupId) {
     }
     throw error;
   }
+}
+
+/**
+ * 过滤掉CQ at代码（用于私信场景）
+ * @param {string} message - 原始消息
+ * @returns {string} 过滤后的消息
+ */
+function filterCQAtCodes(message) {
+  if (!message) return '';
+  
+  // 过滤掉 [CQ:at,qq=xxx] 格式的at代码
+  return message.replace(/\[CQ:at,qq=\d+\]/g, '').trim();
 }
 
 /**
@@ -323,8 +334,21 @@ async function sendReplyToC2C(responseData, userOpenid, messageId) {
       
       // 如果有文本消息，使用图文混合消息
       if (responseData.message) {
-        // 构建图文混合消息
-        await sendMediaWithTextToC2C(userOpenid, fileInfo, responseData.message, messageId);
+        // 过滤CQ at代码后发送图文混合消息
+        const filteredMessage = filterCQAtCodes(responseData.message);
+        if (filteredMessage.trim()) {
+          await sendMediaWithTextToC2C(userOpenid, fileInfo, filteredMessage, messageId);
+        } else {
+          // 如果文本被过滤完了，只发送图片
+          const { sendC2CMessage } = require('../services/messageService');
+          await sendC2CMessage(userOpenid, {
+            content: ' ', // 富媒体消息content需要有值
+            msg_type: 7,   // 富媒体消息类型
+            media: {
+              file_info: fileInfo
+            }
+          }, null, messageId);
+        }
       } else {
         // 只有图片，没有文本
         const { sendC2CMessage } = require('../services/messageService');
@@ -338,8 +362,12 @@ async function sendReplyToC2C(responseData, userOpenid, messageId) {
       }
       
     } else if (responseData.type === "text" && responseData.message) {
-      // 处理文本消息
-      await sendTextToC2C(userOpenid, responseData.message, null, messageId);
+      // 处理文本消息 - 过滤掉CQ at代码
+      const filteredMessage = filterCQAtCodes(responseData.message);
+      if (filteredMessage.trim()) {
+        await sendTextToC2C(userOpenid, filteredMessage, null, messageId);
+      }
+      // 如果过滤后消息为空，则不发送
     }
   } catch (error) {
     console.error('发送QQ私信回复失败:', error);
@@ -382,14 +410,18 @@ async function sendReplyToDirectMessage(responseData, guildId, messageId) {
       
       // 频道私信使用类似频道的方式发送图片
       if (responseData.message) {
-        console.log('频道私信：先发送文本消息，然后发送图片');
-        // 先发送文本
-        await sendTextToDirectMessage(guildId, responseData.message, null, messageId);
+        // 过滤CQ at代码后发送文本和图片
+        const filteredMessage = filterCQAtCodes(responseData.message);
+        if (filteredMessage.trim()) {
+          console.log('频道私信：先发送文本消息，然后发送图片');
+          // 先发送过滤后的文本
+          await sendTextToDirectMessage(guildId, filteredMessage, null, messageId);
+        }
         // 然后尝试发送图片
         try {
           await sendImageToDirectMessage(guildId, imageUrl, '', null, messageId);
         } catch (imgError) {
-          console.error('发送频道私信图片失败，但文本已发送:', imgError.message);
+          console.error('发送频道私信图片失败:', imgError.message);
         }
       } else {
         // 只发送图片
@@ -397,8 +429,12 @@ async function sendReplyToDirectMessage(responseData, guildId, messageId) {
       }
       
     } else if (responseData.type === "text" && responseData.message) {
-      // 处理文本消息
-      await sendTextToDirectMessage(guildId, responseData.message, null, messageId);
+      // 处理文本消息 - 过滤掉CQ at代码
+      const filteredMessage = filterCQAtCodes(responseData.message);
+      if (filteredMessage.trim()) {
+        await sendTextToDirectMessage(guildId, filteredMessage, null, messageId);
+      }
+      // 如果过滤后消息为空，则不发送
     }
   } catch (error) {
     console.error('发送频道私信回复失败:', error);
