@@ -7,6 +7,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { sendTextToC2C, sendTextToDirectMessage } = require('../services/messageService');
+const { processBase64Image, getImageInfo } = require('../utils/imageProcessor');
 
 /**
  * 检查用户是否为管理员
@@ -337,11 +338,21 @@ async function sendReplyToC2C(responseData, userOpenid, messageId) {
       const fileName = originalFileName;
       const imagePath = path.join(tempImageDir, fileName);
       
-      // 解码Base64并保存图片
-      const imageBuffer = Buffer.from(responseData.base64, 'base64');
-      fs.writeFileSync(imagePath, imageBuffer);
+      // 使用图片处理器处理base64图片（包含压缩）
+      const processSuccess = await processBase64Image(responseData.base64, imagePath);
       
-      console.log(`QQ私信图片已保存至: ${imagePath}`);
+      if (!processSuccess) {
+        console.error('QQ私信图片处理失败，跳过发送');
+        return;
+      }
+      
+      console.log(`QQ私信图片处理完成: ${imagePath}`);
+      
+      // 显示图片信息
+      const imageInfo = await getImageInfo(imagePath);
+      if (imageInfo) {
+        console.log(`QQ私信最终图片信息: ${imageInfo.width}x${imageInfo.height}, ${imageInfo.format}, ${imageInfo.sizeMB}MB`);
+      }
       
       // 获取绝对URL路径并进行URL编码
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
@@ -416,11 +427,21 @@ async function sendReplyToDirectMessage(responseData, guildId, messageId) {
       const fileName = originalFileName;
       const imagePath = path.join(tempImageDir, fileName);
       
-      // 解码Base64并保存图片
-      const imageBuffer = Buffer.from(responseData.base64, 'base64');
-      fs.writeFileSync(imagePath, imageBuffer);
+      // 使用图片处理器处理base64图片（包含压缩）
+      const processSuccess = await processBase64Image(responseData.base64, imagePath);
       
-      console.log(`频道私信图片已保存至: ${imagePath}`);
+      if (!processSuccess) {
+        console.error('频道私信图片处理失败，跳过发送');
+        return;
+      }
+      
+      console.log(`频道私信图片处理完成: ${imagePath}`);
+      
+      // 显示图片信息
+      const imageInfo = await getImageInfo(imagePath);
+      if (imageInfo) {
+        console.log(`频道私信最终图片信息: ${imageInfo.width}x${imageInfo.height}, ${imageInfo.format}, ${imageInfo.sizeMB}MB`);
+      }
       
       // 获取绝对URL路径并进行URL编码
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
