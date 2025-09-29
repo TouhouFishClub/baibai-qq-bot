@@ -113,16 +113,16 @@ async function handleC2CMessage(eventData) {
     try {
       const apiResponse = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
       
-      // 发送回复
+      // 发送回复 - 使用原始消息ID作为被动消息
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
         const message = apiResponse.data.message || apiResponse.data.text || JSON.stringify(apiResponse.data);
-        await sendTextToC2C(userId, message);
+        await sendTextToC2C(userId, message, null, messageId);
       } else {
-        await sendTextToC2C(userId, '处理完成，但没有返回结果');
+        await sendTextToC2C(userId, '处理完成，但没有返回结果', null, messageId);
       }
     } catch (apiError) {
       console.error('调用OpenAPI错误:', apiError);
-      await sendTextToC2C(userId, '处理请求时发生错误，请稍后再试');
+      await sendTextToC2C(userId, '处理请求时发生错误，请稍后再试', null, messageId);
     }
     
   } catch (error) {
@@ -205,16 +205,16 @@ async function handleDirectMessage(eventData) {
     try {
       const apiResponse = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
       
-      // 发送回复
+      // 发送回复 - 使用原始消息ID作为被动消息
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
         const message = apiResponse.data.message || apiResponse.data.text || JSON.stringify(apiResponse.data);
-        await sendTextToDirectMessage(guild_id, message);
+        await sendTextToDirectMessage(guild_id, message, null, messageId);
       } else {
-        await sendTextToDirectMessage(guild_id, '处理完成，但没有返回结果');
+        await sendTextToDirectMessage(guild_id, '处理完成，但没有返回结果', null, messageId);
       }
     } catch (apiError) {
       console.error('调用OpenAPI错误:', apiError);
-      await sendTextToDirectMessage(guild_id, '处理请求时发生错误，请稍后再试');
+      await sendTextToDirectMessage(guild_id, '处理请求时发生错误，请稍后再试', null, messageId);
     }
     
   } catch (error) {
