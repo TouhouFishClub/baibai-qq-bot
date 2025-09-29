@@ -228,44 +228,55 @@ async function handleDirectMessage(eventData) {
  */
 async function callOpenAPI(command, content, userId, groupId) {
   try {
-    console.log(`调用OpenAPI: command=${command}, content=${content}, userId=${userId}, groupId=${groupId}`);
-    
-    // 构建请求URL
-    const baseUrl = process.env.OPENAPI_BASE_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/api/openapi`;
-    
-    // 构建请求数据
-    const requestData = {
-      command: command,
-      content: content,
-      user: userId,
-      group: groupId
-    };
-    
-    console.log('OpenAPI请求数据:', requestData);
-    
-    // 发送请求
-    const response = await axios.post(url, requestData, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000 // 30秒超时
-    });
-    
-    console.log('OpenAPI响应:', response.data);
-    
-    // 返回结果
-    if (response.data && typeof response.data === 'object') {
-      return response.data.result || response.data.message || JSON.stringify(response.data);
-    } else {
-      return response.data || '';
+    if (!content) {
+      console.log(`命令 ${command} 内容为空，不执行API调用`);
+      return;
     }
     
+    // 从环境变量中获取API基础URL
+    const API_BASE_URL = process.env.API_BASE_URL;
+    
+    if (!API_BASE_URL) {
+      throw new Error('未配置API_BASE_URL环境变量');
+    }
+    
+    // 构建请求参数 - 对content进行URL编码，避免特殊字符造成问题
+    const params = { 
+      content: encodeURIComponent(content)
+    };
+    
+    // 根据不同命令添加不同的参数
+    switch (command) {
+      case 'opt':
+        params.from = userId;
+        break;
+      case 'meu':
+        params.from = userId;
+        params.groupid = groupId;
+        break;
+      case 'uni':
+        params.group = groupId;
+        params.from = userId;
+        // 默认用户名为 OPENAPI-用户ID
+        params.name = `OPENAPI-${userId}`;
+        // 默认群组名称为 OPENAPI-群组ID
+        params.groupName = `OPENAPI-${groupId}`;
+        break;
+    }
+    
+    // 发送请求
+    console.log(`发送API请求: ${API_BASE_URL}/openapi/${command}`, params);
+    
+    const response = await axios.get(`${API_BASE_URL}/openapi/${command}`, { params });
+    
+    console.log(`API响应结果:`, response.data);
+    
+    return response.data;
   } catch (error) {
-    console.error('OpenAPI调用错误:', error.message);
+    console.error(`API请求失败 (${command}):`, error.message);
     if (error.response) {
-      console.error('API响应状态:', error.response.status);
-      console.error('API响应数据:', error.response.data);
+      console.error('响应数据:', error.response.data);
+      console.error('响应状态:', error.response.status);
     }
     throw error;
   }
