@@ -111,10 +111,12 @@ async function handleC2CMessage(eventData) {
     
     // 调用openapi处理命令
     try {
-      const result = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
+      const apiResponse = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
       
-      if (result && result.trim()) {
-        await sendTextToC2C(userId, result);
+      // 发送回复
+      if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
+        const message = apiResponse.data.message || apiResponse.data.text || JSON.stringify(apiResponse.data);
+        await sendTextToC2C(userId, message);
       } else {
         await sendTextToC2C(userId, '处理完成，但没有返回结果');
       }
@@ -201,10 +203,12 @@ async function handleDirectMessage(eventData) {
     
     // 调用openapi处理命令
     try {
-      const result = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
+      const apiResponse = await callOpenAPI(commandPrefix, actualContent, userId, groupId);
       
-      if (result && result.trim()) {
-        await sendTextToDirectMessage(guild_id, result);
+      // 发送回复
+      if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
+        const message = apiResponse.data.message || apiResponse.data.text || JSON.stringify(apiResponse.data);
+        await sendTextToDirectMessage(guild_id, message);
       } else {
         await sendTextToDirectMessage(guild_id, '处理完成，但没有返回结果');
       }
