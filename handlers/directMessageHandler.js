@@ -115,8 +115,7 @@ async function handleC2CMessage(eventData) {
       
       // 发送回复 - 使用原始消息ID作为被动消息
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
-        const message = apiResponse.data.message || apiResponse.data.text || JSON.stringify(apiResponse.data);
-        await sendTextToC2C(userId, message, null, messageId);
+        await sendReplyToC2C(apiResponse.data, userId, messageId);
       } else {
         await sendTextToC2C(userId, '处理完成，但没有返回结果', null, messageId);
       }
@@ -207,8 +206,7 @@ async function handleDirectMessage(eventData) {
       
       // 发送回复 - 使用原始消息ID作为被动消息
       if (apiResponse && apiResponse.status === "ok" && apiResponse.data) {
-        const message = apiResponse.data.message || apiResponse.data.text || JSON.stringify(apiResponse.data);
-        await sendTextToDirectMessage(guild_id, message, null, messageId);
+        await sendReplyToDirectMessage(apiResponse.data, guild_id, messageId);
       } else {
         await sendTextToDirectMessage(guild_id, '处理完成，但没有返回结果', null, messageId);
       }
@@ -284,6 +282,226 @@ async function callOpenAPI(command, content, userId, groupId) {
     }
     throw error;
   }
+}
+
+/**
+ * 发送回复到QQ私信
+ * @param {object} responseData - API响应数据
+ * @param {string} userOpenid - 用户openid
+ * @param {string} messageId - 用户消息ID
+ */
+async function sendReplyToC2C(responseData, userOpenid, messageId) {
+  try {
+    if (responseData.type === "image" && responseData.base64 && responseData.path) {
+      // 处理图片消息 - QQ私信需要先上传获取file_info，类似群聊
+      // 创建临时图片目录
+      const tempImageDir = path.join(__dirname, '../public/temp_images');
+      if (!fs.existsSync(tempImageDir)) {
+        fs.mkdirSync(tempImageDir, { recursive: true });
+      }
+      
+      // 获取文件名并处理中文字符
+      const originalFileName = path.basename(responseData.path);
+      const fileName = originalFileName;
+      const imagePath = path.join(tempImageDir, fileName);
+      
+      // 解码Base64并保存图片
+      const imageBuffer = Buffer.from(responseData.base64, 'base64');
+      fs.writeFileSync(imagePath, imageBuffer);
+      
+      console.log(`QQ私信图片已保存至: ${imagePath}`);
+      
+      // 获取绝对URL路径并进行URL编码
+      const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
+      const encodedFileName = encodeURIComponent(fileName);
+      const imageUrl = `${serverHost}/temp_images/${encodedFileName}`;
+      
+      console.log(`QQ私信图片URL: ${imageUrl}`);
+      
+      // 调用QQ API上传图片，获取file_info
+      const fileInfo = await uploadFileForC2C(userOpenid, imageUrl, 1); // 1表示图片类型
+      
+      // 如果有文本消息，使用图文混合消息
+      if (responseData.message) {
+        // 构建图文混合消息
+        await sendMediaWithTextToC2C(userOpenid, fileInfo, responseData.message, messageId);
+      } else {
+        // 只有图片，没有文本
+        const { sendC2CMessage } = require('../services/messageService');
+        await sendC2CMessage(userOpenid, {
+          content: ' ', // 富媒体消息content需要有值
+          msg_type: 7,   // 富媒体消息类型
+          media: {
+            file_info: fileInfo
+          }
+        }, null, messageId);
+      }
+      
+    } else if (responseData.type === "text" && responseData.message) {
+      // 处理文本消息
+      await sendTextToC2C(userOpenid, responseData.message, null, messageId);
+    }
+  } catch (error) {
+    console.error('发送QQ私信回复失败:', error);
+  }
+}
+
+/**
+ * 发送回复到频道私信
+ * @param {object} responseData - API响应数据
+ * @param {string} guildId - 频道服务器ID
+ * @param {string} messageId - 用户消息ID
+ */
+async function sendReplyToDirectMessage(responseData, guildId, messageId) {
+  try {
+    if (responseData.type === "image" && responseData.base64 && responseData.path) {
+      // 处理图片消息 - 频道私信直接使用图片URL，类似频道
+      // 创建临时图片目录
+      const tempImageDir = path.join(__dirname, '../public/temp_images');
+      if (!fs.existsSync(tempImageDir)) {
+        fs.mkdirSync(tempImageDir, { recursive: true });
+      }
+      
+      // 获取文件名并处理中文字符
+      const originalFileName = path.basename(responseData.path);
+      const fileName = originalFileName;
+      const imagePath = path.join(tempImageDir, fileName);
+      
+      // 解码Base64并保存图片
+      const imageBuffer = Buffer.from(responseData.base64, 'base64');
+      fs.writeFileSync(imagePath, imageBuffer);
+      
+      console.log(`频道私信图片已保存至: ${imagePath}`);
+      
+      // 获取绝对URL路径并进行URL编码
+      const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
+      const encodedFileName = encodeURIComponent(fileName);
+      const imageUrl = `${serverHost}/temp_images/${encodedFileName}`;
+      
+      console.log(`频道私信图片URL: ${imageUrl}`);
+      
+      // 频道私信使用类似频道的方式发送图片
+      if (responseData.message) {
+        console.log('频道私信：先发送文本消息，然后发送图片');
+        // 先发送文本
+        await sendTextToDirectMessage(guildId, responseData.message, null, messageId);
+        // 然后尝试发送图片
+        try {
+          await sendImageToDirectMessage(guildId, imageUrl, '', null, messageId);
+        } catch (imgError) {
+          console.error('发送频道私信图片失败，但文本已发送:', imgError.message);
+        }
+      } else {
+        // 只发送图片
+        await sendImageToDirectMessage(guildId, imageUrl, '', null, messageId);
+      }
+      
+    } else if (responseData.type === "text" && responseData.message) {
+      // 处理文本消息
+      await sendTextToDirectMessage(guildId, responseData.message, null, messageId);
+    }
+  } catch (error) {
+    console.error('发送频道私信回复失败:', error);
+  }
+}
+
+/**
+ * 上传文件获取file_info (用于QQ私信)
+ * @param {string} userOpenid - 用户的openid
+ * @param {string} url - 文件URL
+ * @param {number} fileType - 文件类型（1:图片, 2:视频, 3:语音, 4:文件）
+ * @returns {Promise<string>} file_info
+ */
+async function uploadFileForC2C(userOpenid, url, fileType) {
+  try {
+    const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
+    
+    // 获取访问令牌
+    const { getAccessToken } = require('../services/messageService');
+    const accessToken = await getAccessToken();
+    
+    // 构建上传文件请求 - QQ私信使用用户API
+    const response = await axios.post(
+      `${QQ_API_BASE_URL}/v2/users/${userOpenid}/files`,
+      {
+        file_type: fileType,
+        url: url,
+        srv_send_msg: false // 不直接发送，仅获取file_info
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `QQBot ${accessToken}`
+        }
+      }
+    );
+    
+    if (!response.data || !response.data.file_info) {
+      throw new Error('上传QQ私信文件失败，未获取到file_info: ' + JSON.stringify(response.data));
+    }
+    
+    console.log('QQ私信文件上传成功，获取到file_info:', response.data);
+    return response.data.file_info;
+    
+  } catch (error) {
+    console.error('上传QQ私信文件失败:', error.message);
+    if (error.response) {
+      console.error('API响应:', error.response.data);
+      console.error('状态码:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 发送图文混合消息到QQ私信
+ * @param {string} userOpenid - 用户的openid 
+ * @param {string} fileInfo - 文件信息
+ * @param {string} text - 文本内容
+ * @param {string} messageId - 回复的消息ID
+ */
+async function sendMediaWithTextToC2C(userOpenid, fileInfo, text, messageId) {
+  try {
+    const { sendC2CMessage } = require('../services/messageService');
+    
+    // 构建图文混合消息
+    await sendC2CMessage(userOpenid, {
+      content: text, // 文本内容放在content中
+      msg_type: 7,   // 富媒体消息类型
+      media: {
+        file_info: fileInfo
+      }
+    }, null, messageId);
+    
+    console.log('QQ私信图文混合消息发送成功');
+  } catch (error) {
+    console.error('发送QQ私信图文混合消息失败:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 发送图片消息到频道私信
+ * @param {string} guildId - 频道服务器ID
+ * @param {string} imageUrl - 图片URL
+ * @param {string} [content] - 可选的文本内容
+ * @param {string} [eventId] - 前置事件ID (可选)
+ * @param {string} [msgId] - 前置消息ID (可选)
+ * @returns {Promise<object>} 发送结果
+ */
+async function sendImageToDirectMessage(guildId, imageUrl, content = '', eventId = null, msgId = null) {
+  const { sendDirectMessage } = require('../services/messageService');
+  
+  const messageData = {
+    image: imageUrl // 频道私信API使用image字段直接传URL，类似频道
+  };
+  
+  // 如果有文本内容，添加到消息中
+  if (content && content.trim()) {
+    messageData.content = content;
+  }
+  
+  return sendDirectMessage(guildId, messageData, eventId, msgId);
 }
 
 module.exports = {
