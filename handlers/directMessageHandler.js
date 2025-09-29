@@ -98,11 +98,14 @@ async function handleC2CMessage(eventData) {
     
     console.log(`QQ私信命令解析: 前缀=${commandPrefix}, 内容=${actualContent}`);
     
-    // 检查某些功能是否需要管理员权限
-    const requiresAdmin = ['mbd', 'opt'].includes(commandPrefix);
-    if (requiresAdmin && !isAdminUser(userId)) {
-      await sendTextToC2C(userId, '此功能仅限管理员使用');
-      return;
+    // 检查uni命令是否包含管道符号，如果包含则需要管理员权限
+    if (commandPrefix === 'uni' && actualContent.includes('|')) {
+      if (!isAdminUser(userId)) {
+        console.log(`用户 ${userId} 尝试使用管理员功能（uni包含|），但不是管理员`);
+        await sendFilteredTextToC2C(userId, '此功能仅限管理员使用', null, messageId);
+        return;
+      }
+      console.log(`管理员 ${userId} 使用包含|的uni命令`);
     }
     
     // 获取配置信息，用于调用openapi时获取group参数
@@ -120,7 +123,7 @@ async function handleC2CMessage(eventData) {
       // 如果没有返回结果，静默处理，不发送回复
     } catch (apiError) {
       console.error('调用OpenAPI错误:', apiError);
-      await sendTextToC2C(userId, '处理请求时发生错误，请稍后再试', null, messageId);
+      await sendFilteredTextToC2C(userId, '处理请求时发生错误，请稍后再试', null, messageId);
     }
     
   } catch (error) {
@@ -188,11 +191,14 @@ async function handleDirectMessage(eventData) {
     
     console.log(`频道私信命令解析: 前缀=${commandPrefix}, 内容=${actualContent}`);
     
-    // 检查某些功能是否需要管理员权限
-    const requiresAdmin = ['mbd', 'opt'].includes(commandPrefix);
-    if (requiresAdmin && !isAdminUser(userId)) {
-      await sendTextToDirectMessage(guild_id, '此功能仅限管理员使用');
-      return;
+    // 检查uni命令是否包含管道符号，如果包含则需要管理员权限
+    if (commandPrefix === 'uni' && actualContent.includes('|')) {
+      if (!isAdminUser(userId)) {
+        console.log(`用户 ${userId} 尝试使用管理员功能（uni包含|），但不是管理员`);
+        await sendTextToDirectMessage(guild_id, '此功能仅限管理员使用');
+        return;
+      }
+      console.log(`管理员 ${userId} 使用包含|的uni命令`);
     }
     
     // 获取配置信息，用于调用openapi时获取group参数
@@ -293,6 +299,21 @@ function filterCQAtCodes(message) {
   
   // 过滤掉 [CQ:at,qq=xxx] 格式的at代码
   return message.replace(/\[CQ:at,qq=\d+\]/g, '').trim();
+}
+
+/**
+ * 发送过滤后的文本消息到QQ私信
+ * @param {string} userOpenid - 用户openid
+ * @param {string} message - 原始消息
+ * @param {string} [eventId] - 前置事件ID (可选)
+ * @param {string} [msgId] - 前置消息ID (可选)
+ */
+async function sendFilteredTextToC2C(userOpenid, message, eventId = null, msgId = null) {
+  const filteredMessage = filterCQAtCodes(message);
+  if (filteredMessage.trim()) {
+    await sendTextToC2C(userOpenid, filteredMessage, eventId, msgId);
+  }
+  // 如果过滤后消息为空，则不发送
 }
 
 /**
