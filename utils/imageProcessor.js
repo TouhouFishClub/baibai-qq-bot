@@ -23,9 +23,9 @@ try {
  * 图片压缩配置 - 优化为高质量保真压缩
  */
 const COMPRESSION_CONFIG = {
-  // 目标文件大小 - 2MB以下，更合理的平衡
-  TARGET_FILE_SIZE: 1.8 * 1024 * 1024,  // 1.8MB目标
-  MAX_FILE_SIZE: 2 * 1024 * 1024,       // 2MB硬限制
+  // 目标文件大小 - 1.6MB以下，最佳平衡点
+  TARGET_FILE_SIZE: 1.4 * 1024 * 1024,  // 1.4MB目标
+  MAX_FILE_SIZE: 1.6 * 1024 * 1024,     // 1.6MB硬限制
   // 最大宽度 - 2560px (更宽松，支持2K+)
   MAX_WIDTH: 2560,
   // 最大高度 - 16000px (支持更长截图)
@@ -63,21 +63,21 @@ async function needsCompression(filePath) {
     
     console.log(`图片文件大小: ${fileSizeMB.toFixed(2)}MB`);
     
-    // 文件大小检查 - 目标2MB以下
+    // 文件大小检查 - 目标1.6MB以下
     if (fileSizeBytes > COMPRESSION_CONFIG.MAX_FILE_SIZE) {
-      console.log(`图片超过2MB限制 (${fileSizeMB.toFixed(2)}MB > 2MB)，需要压缩`);
+      console.log(`图片超过1.6MB限制 (${fileSizeMB.toFixed(2)}MB > 1.6MB)，需要压缩`);
       return true;
     }
     
-    // 对于接近2MB的文件也进行预防性优化
-    if (fileSizeMB > 1.6) {
-      console.log(`图片接近2MB (${fileSizeMB.toFixed(2)}MB > 1.6MB)，预防性压缩`);
+    // 对于接近1.6MB的文件也进行预防性优化
+    if (fileSizeMB > 1.2) {
+      console.log(`图片接近1.6MB (${fileSizeMB.toFixed(2)}MB > 1.2MB)，预防性压缩`);
       return true;
     }
     
     // 对于中等大小文件检查像素数优化潜力
-    if (fileSizeMB > 1.0) {
-      console.log(`图片较大 (${fileSizeMB.toFixed(2)}MB > 1MB)，检查优化潜力`);
+    if (fileSizeMB > 0.8) {
+      console.log(`图片较大 (${fileSizeMB.toFixed(2)}MB > 0.8MB)，检查优化潜力`);
       return true;
     }
     
@@ -142,7 +142,7 @@ function getDynamicCompressionConfig(originalSizeMB, format, targetPixels) {
   let quality, compressionLevel;
   
   // 根据原始大小和压缩需求动态调整
-  const compressionRatio = originalSizeMB / 1.8; // 目标1.8MB
+  const compressionRatio = originalSizeMB / 1.4; // 目标1.4MB
   
   if (compressionRatio <= 1.5) {
     // 轻度压缩：保持高质量
@@ -231,28 +231,28 @@ async function compressImage(inputPath, outputPath) {
       newHeight = Math.round(metadata.height * ratio);
       console.log(`基于尺寸限制缩放: 比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
-    // 策略2.5: 长条图特殊处理 - 适度压缩到2MB以下
-    else if (metadata.height > 10000 && originalSizeMB > 1.8) {
+    // 策略2.5: 长条图特殊处理 - 压缩到1.6MB以下
+    else if (metadata.height > 10000 && originalSizeMB > 1.4) {
       needResize = true;
-      // 对于长条图，适度缩小以确保2MB以下
-      const targetPixels = Math.min(10 * 1024 * 1024, COMPRESSION_CONFIG.MAX_TOTAL_PIXELS); // 目标1000万像素
+      // 对于长条图，适度缩小以确保1.6MB以下
+      const targetPixels = Math.min(9 * 1024 * 1024, COMPRESSION_CONFIG.MAX_TOTAL_PIXELS); // 目标900万像素
       const pixelRatio = Math.sqrt(targetPixels / totalPixels);
       newWidth = Math.round(metadata.width * pixelRatio);
       newHeight = Math.round(metadata.height * pixelRatio);
-      console.log(`长条图适度优化: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight} (目标2MB以下)`);
+      console.log(`长条图优化: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight} (目标1.6MB以下)`);
     }
-    // 策略2.6: 对于需要压缩到2MB以下的图片
-    else if (originalSizeMB > 2.0) {
+    // 策略2.6: 对于需要压缩到1.6MB以下的图片
+    else if (originalSizeMB > 1.6) {
       needResize = true;
       // 根据文件大小估算需要的像素减少比例
-      const sizeRatio = 1.8 / originalSizeMB; // 目标1.8MB
+      const sizeRatio = 1.4 / originalSizeMB; // 目标1.4MB
       const estimatedPixelRatio = Math.sqrt(sizeRatio * 0.8); // 适度估计
       const targetPixels = Math.round(totalPixels * estimatedPixelRatio);
       const pixelRatio = Math.sqrt(targetPixels / totalPixels);
       
       newWidth = Math.round(metadata.width * pixelRatio);
       newHeight = Math.round(metadata.height * pixelRatio);
-      console.log(`适度压缩优化: 目标${(targetPixels/1024/1024).toFixed(1)}M像素, 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
+      console.log(`压缩优化: 目标${(targetPixels/1024/1024).toFixed(1)}M像素, 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
     // 策略3: 极端长宽比处理
     else if (aspectRatio > COMPRESSION_CONFIG.MAX_ASPECT_RATIO) {
@@ -380,14 +380,14 @@ async function compressImage(inputPath, outputPath) {
     
     console.log(`图片压缩完成: ${compressedSizeMB.toFixed(2)}MB (压缩率: ${compressionRatio}%)`);
     
-    // 文件大小检查 - 目标2MB以下
-    if (compressedSizeMB > 2.0) {
-      console.log(`文件仍超过2MB (${compressedSizeMB.toFixed(2)}MB)，启动二次压缩...`);
+    // 文件大小检查 - 目标1.6MB以下
+    if (compressedSizeMB > 1.6) {
+      console.log(`文件仍超过1.6MB (${compressedSizeMB.toFixed(2)}MB)，启动二次压缩...`);
       
       let attempts = 0;
       let currentSize = compressedSizeMB;
       
-      while (currentSize > 2.0 && attempts < 2) {
+      while (currentSize > 1.6 && attempts < 2) {
         attempts++;
         console.log(`第${attempts}次二次压缩 (当前${currentSize.toFixed(2)}MB)...`);
         
@@ -396,7 +396,7 @@ async function compressImage(inputPath, outputPath) {
           const secondaryMeta = await secondaryImage.metadata();
           
           // 计算需要的压缩比例
-          const targetSizeMB = 1.6; // 目标1.6MB，留有余量
+          const targetSizeMB = 1.3; // 目标1.3MB，留有余量
           const sizeReductionRatio = targetSizeMB / currentSize;
           const pixelReductionRatio = Math.sqrt(sizeReductionRatio * 0.8); // 适度估计
           
@@ -404,8 +404,8 @@ async function compressImage(inputPath, outputPath) {
           const finalHeight = Math.max(300, Math.round(secondaryMeta.height * pixelReductionRatio));
           
           // 动态调整质量
-          let quality = 75 - (attempts - 1) * 10; // 75, 65
-          quality = Math.max(quality, 60); // 最低60质量
+          let quality = 78 - (attempts - 1) * 8; // 78, 70
+          quality = Math.max(quality, 65); // 最低65质量
           
           await secondaryImage
             .resize(finalWidth, finalHeight, {
@@ -433,13 +433,13 @@ async function compressImage(inputPath, outputPath) {
         }
       }
       
-      if (currentSize > 2.0) {
+      if (currentSize > 1.6) {
         console.warn(`警告: 经过${attempts}次压缩，文件仍为${currentSize.toFixed(2)}MB，可能影响上传`);
       } else {
-        console.log(`✅ 成功压缩到2MB以下: ${currentSize.toFixed(2)}MB`);
+        console.log(`✅ 成功压缩到1.6MB以下: ${currentSize.toFixed(2)}MB`);
       }
     } else {
-      console.log(`✅ 压缩成功，文件大小: ${compressedSizeMB.toFixed(2)}MB (< 2MB)`);
+      console.log(`✅ 压缩成功，文件大小: ${compressedSizeMB.toFixed(2)}MB (< 1.6MB)`);
     }
     
     return true;
