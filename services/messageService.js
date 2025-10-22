@@ -5,6 +5,7 @@
 
 const axios = require('axios');
 const qs = require('querystring');
+const logger = require('../utils/logger');
 
 // QQ机器人API基础URL
 const QQ_API_BASE_URL = 'https://api.sgroup.qq.com';
@@ -40,12 +41,12 @@ async function getAccessToken() {
       throw new Error('获取访问令牌失败: ' + JSON.stringify(tokenResponse.data));
     }
     
-    console.log('成功获取访问令牌，有效期:', tokenResponse.data.expires_in, '秒');
+    logger.debug(`获取访问令牌成功，有效期: ${tokenResponse.data.expires_in}秒`);
     return tokenResponse.data.access_token;
   } catch (error) {
-    console.error('获取访问令牌错误:', error.message);
+    logger.error('获取访问令牌失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
+      logger.debug('API响应详情', error.response.data);
     }
     throw error;
   }
@@ -105,14 +106,13 @@ async function sendGroupMessage(groupOpenid, message, eventId = null, msgId = nu
       }
     );
     
-    console.log('群聊消息发送成功:', response.data);
+    logger.info('群聊消息发送成功');
     return response.data;
     
   } catch (error) {
-    console.error('发送群聊消息错误:', error.message);
+    logger.error('发送群聊消息失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }
@@ -211,9 +211,7 @@ async function sendChannelMessage(channelId, messageData, eventId = null, msgId 
     if (eventId) requestData.event_id = eventId;
     if (msgId) requestData.msg_id = msgId;
     
-    console.log('发送频道消息请求数据:', requestData);
-    console.log('AccessToken长度:', accessToken.length);
-    console.log('使用认证格式: QQBot', accessToken);
+    logger.debug('发送频道消息', { channelId, contentLength: requestData.content?.length || 0 });
     
     // 发送消息请求 - 根据官方文档，频道消息也使用QQBot认证格式
     const response = await axios.post(
@@ -227,14 +225,13 @@ async function sendChannelMessage(channelId, messageData, eventId = null, msgId 
       }
     );
     
-    console.log('频道消息发送成功:', response.data);
+    logger.info('频道消息发送成功');
     return response.data;
     
   } catch (error) {
-    console.error('发送频道消息错误:', error.message);
+    logger.error('发送频道消息失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }
@@ -310,7 +307,7 @@ async function sendImageToChannel(channelId, imageUrl, content = '', eventId = n
  */
 async function sendMediaToChannel(channelId, media, eventId = null, msgId = null) {
   // 对于频道，我们需要将媒体转换为图片URL
-  console.warn('sendMediaToChannel: 频道API建议使用sendImageToChannel');
+  logger.warn('sendMediaToChannel: 频道API建议使用sendImageToChannel');
   
   // 这里需要根据具体的media结构来处理
   // 暂时返回错误，建议使用新的图片发送接口
@@ -371,14 +368,13 @@ async function sendC2CMessage(userOpenid, message, eventId = null, msgId = null,
       }
     );
     
-    console.log('QQ单聊消息发送成功:', response.data);
+    logger.info('QQ单聊消息发送成功');
     return response.data;
     
   } catch (error) {
-    console.error('发送QQ单聊消息错误:', error.message);
+    logger.error('发送QQ单聊消息失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }
@@ -428,8 +424,7 @@ async function sendDirectMessage(guildId, messageData, eventId = null, msgId = n
     if (eventId) requestData.event_id = eventId;
     if (msgId) requestData.msg_id = msgId;
     
-    console.log('发送频道私信消息请求数据:', requestData);
-    console.log('使用认证格式: QQBot', accessToken);
+    logger.debug('发送频道私信消息', { guildId, contentLength: requestData.content?.length || 0 });
     
     // 发送消息请求 - 根据官方文档使用/dms/{guild_id}/messages
     const response = await axios.post(
@@ -443,14 +438,13 @@ async function sendDirectMessage(guildId, messageData, eventId = null, msgId = n
       }
     );
     
-    console.log('频道私信消息发送成功:', response.data);
+    logger.info('频道私信消息发送成功');
     return response.data;
     
   } catch (error) {
-    console.error('发送频道私信消息错误:', error.message);
+    logger.error('发送频道私信消息失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }

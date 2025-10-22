@@ -16,6 +16,7 @@ const adminAuthRoutes = require('../routes/adminAuthRoutes');
 
 // 引入自动推送服务
 const autoPushService = require('../services/autoPushService');
+const logger = require('../utils/logger');
 
 // 初始化Express应用
 const app = express();
@@ -59,7 +60,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // 简单的请求日志中间件
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  logger.api(req.method, req.url);
   next();
 });
 
@@ -106,17 +107,16 @@ app.use((err, req, res, next) => {
 
 // 启动服务器
 app.listen(PORT, async () => {
-  console.log(`服务器运行在 http://localhost:${PORT}`);
-  console.log(`环境: ${config.server.environment}`);
-  console.log(`机器人名称: ${process.env.QQ_BOT_NAME}`);
-  console.log(`QQ Webhook 路径: http://localhost:${PORT}/qq/webhook`);
+  logger.service(`服务器运行在 http://localhost:${PORT}`);
+  logger.service(`环境: ${config.server.environment}`);
+  logger.service(`机器人名称: ${process.env.QQ_BOT_NAME}`);
+  logger.service(`QQ Webhook 路径: http://localhost:${PORT}/qq/webhook`);
   
   // 初始化自动推送服务
   try {
     await autoPushService.initializeService();
-    console.log('自动推送服务初始化完成');
   } catch (error) {
-    console.error('自动推送服务初始化失败:', error.message);
+    logger.error('自动推送服务初始化失败', error.message);
   }
 });
 

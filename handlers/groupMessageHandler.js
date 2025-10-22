@@ -8,13 +8,14 @@ const fs = require('fs');
 const path = require('path');
 const { sendTextToGroup, sendMediaToGroup } = require('../services/messageService');
 const { processBase64Image, getImageInfo } = require('../utils/imageProcessor');
+const logger = require('../utils/logger');
 
 /**
  * 处理@机器人消息
  */
 async function handleGroupAtMessage(eventData) {
   try {
-    console.log('处理群中@机器人消息:', eventData);
+    logger.debug('处理群中@机器人消息', { groupId: eventData.group_id, content: eventData.content });
     
     // 获取消息内容和相关信息
     const { content, author, group_id, group_openid, id: messageId } = eventData;
@@ -63,8 +64,7 @@ async function handleGroupAtMessage(eventData) {
     }
     
     if (isValidCommand) {
-      console.log(`收到有效命令: ${commandPrefix}`);
-      console.log(`命令内容: ${actualContent}`);
+      logger.command(commandPrefix, actualContent);
       
       // 构建API请求
       const apiResponse = await callOpenAPI(commandPrefix, actualContent, author.id, group_id);
@@ -74,7 +74,7 @@ async function handleGroupAtMessage(eventData) {
         await sendReplyToGroup(apiResponse.data, group_openid, messageId);
       }
     } else {
-      console.log('收到未匹配命令的消息，使用uni接口处理');
+      logger.debug('使用uni接口处理未匹配命令');
       
       // 未匹配到特定命令的消息都通过uni接口处理
       const apiResponse = await callOpenAPI('uni', trimmedContent, author.id, group_id);
@@ -85,7 +85,7 @@ async function handleGroupAtMessage(eventData) {
       }
     }
   } catch (error) {
-    console.error('处理群聊@消息失败:', error);
+    logger.error('处理群聊@消息失败', error.message);
   }
 }
 
@@ -114,25 +114,20 @@ async function sendReplyToGroup(responseData, groupOpenid, messageId) {
       const processSuccess = await processBase64Image(responseData.base64, imagePath);
       
       if (!processSuccess) {
-        console.error('图片处理失败，跳过发送');
+        logger.error('图片处理失败，跳过发送');
         return;
       }
-      
-      console.log(`图片处理完成: ${imagePath}`);
       
       // 显示图片信息
       const imageInfo = await getImageInfo(imagePath);
       if (imageInfo) {
-        console.log(`最终图片信息: ${imageInfo.width}x${imageInfo.height}, ${imageInfo.format}, ${imageInfo.sizeMB}MB`);
+        logger.info(`图片处理完成: ${imageInfo.width}x${imageInfo.height}, ${imageInfo.format}, ${imageInfo.sizeMB}MB`);
       }
       
       // 获取绝对URL路径并进行URL编码
       const serverHost = process.env.SERVER_HOST || 'http://localhost:3000';
       const encodedFileName = encodeURIComponent(fileName);
       const imageUrl = `${serverHost}/temp_images/${encodedFileName}`;
-      
-      console.log(`原始文件名: ${originalFileName}`);
-      console.log(`编码后URL: ${imageUrl}`);
       
       // 调用QQ API上传图片，获取file_info
       const fileInfo = await uploadFileForGroup(groupOpenid, imageUrl, 1); // 1表示图片类型
@@ -151,7 +146,7 @@ async function sendReplyToGroup(responseData, groupOpenid, messageId) {
       await sendTextToGroup(groupOpenid, responseData.message, null, messageId);
     }
   } catch (error) {
-    console.error('发送群聊回复失败:', error);
+    logger.error('发送群聊回复失败', error.message);
   }
 }
 
@@ -187,17 +182,16 @@ async function uploadFileForGroup(groupOpenid, url, fileType) {
     );
     
     if (!response.data || !response.data.file_info) {
-      throw new Error('上传文件失败，未获取到file_info: ' + JSON.stringify(response.data));
+      throw new Error('上传文件失败，未获取到file_info');
     }
     
-    console.log('文件上传成功，获取到file_info:', response.data);
+    logger.info('文件上传成功');
     return response.data.file_info;
     
   } catch (error) {
-    console.error('上传文件失败:', error.message);
+    logger.error('上传文件失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }
@@ -236,12 +230,12 @@ async function getAccessToken() {
       throw new Error('获取访问令牌失败: ' + JSON.stringify(tokenResponse.data));
     }
     
-    console.log('成功获取访问令牌，有效期:', tokenResponse.data.expires_in, '秒');
+    logger.debug(`获取访问令牌成功，有效期: ${tokenResponse.data.expires_in}秒`);
     return tokenResponse.data.access_token;
   } catch (error) {
-    console.error('获取访问令牌错误:', error.message);
+    logger.error('获取访问令牌失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
+      logger.debug('API响应详情', error.response.data);
     }
     throw error;
   }
@@ -284,13 +278,12 @@ async function sendMediaWithText(groupOpenid, fileInfo, text, messageId) {
       }
     );
     
-    console.log('图文混合消息发送成功:', response.data);
+    logger.info('图文混合消息发送成功');
     return response.data;
   } catch (error) {
-    console.error('发送图文混合消息失败:', error.message);
+    logger.error('发送图文混合消息失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
-      console.error('状态码:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }
@@ -306,7 +299,7 @@ async function sendMediaWithText(groupOpenid, fileInfo, text, messageId) {
 async function callOpenAPI(command, content, userId, groupId) {
   try {
     if (!content) {
-      console.log(`命令 ${command} 内容为空，不执行API调用`);
+      logger.warn(`命令 ${command} 内容为空，跳过API调用`);
       return;
     }
     
@@ -342,18 +335,19 @@ async function callOpenAPI(command, content, userId, groupId) {
     }
     
     // 发送请求
-    console.log(`发送API请求: ${API_BASE_URL}/openapi/${command}`, params);
+    logger.api('GET', `/openapi/${command}`);
     
     const response = await axios.get(`${API_BASE_URL}/openapi/${command}`, { params });
     
-    console.log(`API响应结果:`, response.data);
+    const result = response.data?.status === 'ok' ? '成功' : '失败';
+    logger.command(command, content, result);
     
     return response.data;
   } catch (error) {
-    console.error(`API请求失败 (${command}):`, error.message);
+    logger.error(`API请求失败 (${command})`, error.message);
+    logger.command(command, content, '失败');
     if (error.response) {
-      console.error('响应数据:', error.response.data);
-      console.error('响应状态:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
   }
 }

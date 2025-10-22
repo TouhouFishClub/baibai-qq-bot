@@ -5,6 +5,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const logger = require('../utils/logger');
 
 const { 
   getLatestPosts, 
@@ -144,10 +145,10 @@ async function loadRecordsFromFile() {
  * 初始化服务 - 加载配置和记录
  */
 async function initializeService() {
-  console.log('初始化自动推送服务...');
+  logger.service('初始化自动推送服务...');
   await loadConfigsFromFile();
   await loadRecordsFromFile();
-  console.log('自动推送服务初始化完成');
+  logger.service('自动推送服务初始化完成');
 }
 
 /**
@@ -185,7 +186,7 @@ async function saveConfig(config) {
   // 保存到文件
   await saveConfigsToFile();
   
-  console.log(`配置已保存: ${config.name} (${config.id})`);
+  logger.info(`配置已保存: ${config.name}`);
   return config;
 }
 
@@ -359,7 +360,7 @@ async function pushSinglePost(config, post) {
       content = formatPostToHTML(post, config.sourceName, detail);
     }
     
-    console.log(`准备推送帖子: "${title}" 到频道 ${config.channelId}`);
+    logger.push(config.name, `推送帖子: ${title}`);
     
     // 调用发帖API
     const result = await publishThread(config.channelId, title, content, config.format);

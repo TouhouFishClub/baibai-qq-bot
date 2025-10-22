@@ -1,4 +1,5 @@
 const { verifySignature } = require('../utils/signature');
+const logger = require('../utils/logger');
 
 /**
  * 验证请求签名
@@ -13,7 +14,7 @@ const signatureMiddleware = (req, res, next) => {
     const botSecret =
     process.env.QQ_BOT_SECRET;
     if (!signature) {
-      console.error('错误: 缺少 X-Signature-Ed25519 头');
+      logger.error('缺少签名头 X-Signature-Ed25519');
       return res.status(401).json({ 
         error: '缺少必要的签名信息',
         details: '缺少 X-Signature-Ed25519 头'
@@ -21,7 +22,7 @@ const signatureMiddleware = (req, res, next) => {
     }
 
     if (!timestamp) {
-      console.error('错误: 缺少 X-Signature-Timestamp 头');
+      logger.error('缺少时间戳头 X-Signature-Timestamp');
       return res.status(401).json({ 
         error: '缺少必要的签名信息',
         details: '缺少 X-Signature-Timestamp 头'
@@ -29,7 +30,7 @@ const signatureMiddleware = (req, res, next) => {
     }
 
     if (!botSecret) {
-      console.error('错误: 未配置 QQ_BOT_SECRET 环境变量');
+      logger.error('未配置 QQ_BOT_SECRET 环境变量');
       return res.status(401).json({ 
         error: '缺少必要的签名信息',
         details: '未配置 QQ_BOT_SECRET 环境变量'
@@ -40,28 +41,24 @@ const signatureMiddleware = (req, res, next) => {
     const body = req.rawBody || JSON.stringify(req.body);
     const message = timestamp + body;
 
-    // 添加调试信息
-    console.log('签名验证调试信息:');
-    console.log('- 事件类型:', req.body?.t || 'unknown');
-    console.log('- 时间戳:', timestamp);
-    console.log('- 使用原始请求体:', !!req.rawBody);
-    console.log('- 请求体长度:', body.length);
-    console.log('- 签名消息长度:', message.length);
-    console.log('- 收到的签名:', signature);
-    console.log('- 请求体前100字符:', body.substring(0, 100));
+    // 签名验证调试信息（仅在DEBUG级别显示）
+    const eventType = req.body?.t || 'unknown';
+    logger.debug('签名验证', { 
+      eventType, 
+      timestamp, 
+      bodyLength: body.length, 
+      hasRawBody: !!req.rawBody 
+    });
 
     // 验证签名
     const isValid = verifySignature(botSecret, message, signature);
     
-    // 临时解决方案：如果是AT_MESSAGE_CREATE事件且签名验证失败，先记录日志但不阻止处理
-    const eventType = req.body?.t;
     if (!isValid) {
-      console.error('签名验证失败');
-      console.error('- 验证消息:', message.substring(0, 200) + (message.length > 200 ? '...' : ''));
+      logger.error('签名验证失败', { eventType });
       
       // 如果是频道事件或私信事件，暂时跳过签名验证失败的阻止
       if (eventType === 'AT_MESSAGE_CREATE' || eventType === 'C2C_MESSAGE_CREATE' || eventType === 'DIRECT_MESSAGE_CREATE') {
-        console.warn(`警告: ${eventType}事件签名验证失败，但继续处理（临时解决方案）`);
+        logger.warn(`${eventType}事件签名验证失败，但继续处理（临时解决方案）`);
         next();
         return;
       }
@@ -74,7 +71,7 @@ const signatureMiddleware = (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('签名验证错误:', error);
+    logger.error('签名验证过程出错', error.message);
     return res.status(500).json({ 
       error: '签名验证过程出错',
       details: error.message

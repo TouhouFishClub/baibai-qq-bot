@@ -7,6 +7,7 @@ const { handleGroupAtMessage } = require('../handlers/groupMessageHandler');
 const { handleChannelAtMessage } = require('../handlers/channelMessageHandler');
 const { handleC2CMessage, handleDirectMessage } = require('../handlers/directMessageHandler');
 const { OP_CODE, EVENT_TYPE } = require('../utils/constants');
+const logger = require('../utils/logger');
 
 /**
  * 处理分发事件
@@ -20,7 +21,11 @@ async function handleDispatchEvent(payload, res) {
     const eventType = payload.t;
     const eventData = payload.d;
     
-    console.log(`收到事件: ${eventType}`, JSON.stringify(eventData));
+    logger.info(`收到事件: ${eventType}`, { 
+      groupId: eventData.group_id, 
+      channelId: eventData.channel_id, 
+      userId: eventData.author?.id 
+    });
     
     // 先发送回调确认，避免超时导致的重复推送
     // 返回HTTP回调确认，必须是op: 12的格式
@@ -58,14 +63,14 @@ async function handleDispatchEvent(payload, res) {
           break;
           
         default:
-          console.log(`未处理的事件类型: ${eventType}`);
+          logger.warn(`未处理的事件类型: ${eventType}`);
       }
     } catch (processingError) {
       // 事件处理过程中的错误不影响已发送的回调确认
-      console.error('事件处理过程中发生错误:', processingError);
+      logger.error('事件处理过程中发生错误', processingError.message);
     }
   } catch (error) {
-    console.error('事件处理错误:', error);
+    logger.error('事件处理错误', error.message);
     // 确保在错误情况下也返回正确的回调确认格式
     return res.status(200).json({
       op: OP_CODE.HTTP_CALLBACK_ACK

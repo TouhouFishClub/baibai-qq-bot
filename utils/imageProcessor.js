@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 // 尝试加载sharp，如果失败则使用降级模式
 let sharp = null;
@@ -13,10 +14,10 @@ let sharpAvailable = false;
 try {
   sharp = require('sharp');
   sharpAvailable = true;
-  console.log('Sharp图片处理库已加载，支持图片压缩功能');
+  logger.service('Sharp图片处理库已加载，支持图片压缩功能');
 } catch (error) {
-  console.warn('Sharp图片处理库未安装，图片压缩功能将被禁用');
-  console.warn('如需启用图片压缩，请运行: npm install sharp');
+  logger.warn('Sharp图片处理库未安装，图片压缩功能将被禁用');
+  logger.info('如需启用图片压缩，请运行: npm install sharp');
 }
 
 /**
@@ -61,11 +62,11 @@ async function needsCompression(filePath) {
     const fileSizeBytes = stats.size;
     const fileSizeMB = fileSizeBytes / 1024 / 1024;
     
-    console.log(`图片文件大小: ${fileSizeMB.toFixed(2)}MB`);
+    logger.debug(`图片文件大小: ${fileSizeMB.toFixed(2)}MB`);
     
     // 文件大小检查 - 目标1.6MB以下
     if (fileSizeBytes > COMPRESSION_CONFIG.MAX_FILE_SIZE) {
-      console.log(`图片超过1.6MB限制 (${fileSizeMB.toFixed(2)}MB > 1.6MB)，需要压缩`);
+      logger.info(`图片超过1.6MB限制，需要压缩 (${fileSizeMB.toFixed(2)}MB)`);
       return true;
     }
     
@@ -467,12 +468,12 @@ async function processImage(inputPath, outputPath) {
       // 不需要压缩，直接复制
       if (inputPath !== outputPath) {
         fs.copyFileSync(inputPath, outputPath);
-        console.log(`图片无需压缩，直接复制: ${inputPath} -> ${outputPath}`);
+        logger.debug(`图片无需压缩，直接复制`);
       }
       return true;
     }
   } catch (error) {
-    console.error('图片处理失败:', error);
+    logger.error('图片处理失败', error.message);
     return false;
   }
 }
@@ -492,7 +493,7 @@ async function processBase64Image(base64Data, outputPath) {
     const imageBuffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(tempPath, imageBuffer);
     
-    console.log(`从base64创建临时图片: ${tempPath}`);
+    logger.debug(`从base64创建临时图片: ${tempPath}`);
     
     // 处理图片
     const success = await processImage(tempPath, outputPath);
