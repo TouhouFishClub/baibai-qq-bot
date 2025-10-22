@@ -15,12 +15,12 @@ const logger = require('../utils/logger');
  */
 async function handleChannelAtMessage(eventData, eventType = null) {
   try {
-    // 获取用户名称用于日志
-    const userName = (member && member.nick) || author.username || '未知用户';
-    
     // 获取消息内容和相关信息
     // 注意：频道消息的数据结构与群聊消息不同
     const { content, author, member, channel_id, guild_id, id: messageId, attachments } = eventData;
+    
+    // 获取用户名称用于日志
+    const userName = (member && member.nick) || author.username || '未知用户';
     
     // 检查是否有文本内容，如果没有则直接忽略
     if (!content) {
