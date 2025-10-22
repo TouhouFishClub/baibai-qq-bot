@@ -72,13 +72,13 @@ async function needsCompression(filePath) {
     
     // 对于接近1.6MB的文件也进行预防性优化
     if (fileSizeMB > 1.2) {
-      console.log(`图片接近1.6MB (${fileSizeMB.toFixed(2)}MB > 1.2MB)，预防性压缩`);
+      logger.debug(`图片接近1.6MB，预防性压缩 (${fileSizeMB.toFixed(2)}MB)`);
       return true;
     }
     
     // 对于中等大小文件检查像素数优化潜力
     if (fileSizeMB > 0.8) {
-      console.log(`图片较大 (${fileSizeMB.toFixed(2)}MB > 0.8MB)，检查优化潜力`);
+      logger.debug(`图片较大，检查优化潜力 (${fileSizeMB.toFixed(2)}MB)`);
       return true;
     }
     
@@ -89,45 +89,45 @@ async function needsCompression(filePath) {
         const totalPixels = metadata.width * metadata.height;
         const aspectRatio = Math.max(metadata.width / metadata.height, metadata.height / metadata.width);
         
-        console.log(`图片尺寸: ${metadata.width}x${metadata.height}, 像素: ${(totalPixels / 1024 / 1024).toFixed(1)}M, 长宽比: ${aspectRatio.toFixed(1)}:1`);
+        logger.debug(`图片尺寸: ${metadata.width}x${metadata.height}, 像素: ${(totalPixels / 1024 / 1024).toFixed(1)}M`);
         
         // 检查总像素数（主要限制因素）
         if (totalPixels > COMPRESSION_CONFIG.MAX_TOTAL_PIXELS) {
-          console.log(`图片像素过多 (${(totalPixels / 1024 / 1024).toFixed(1)}M > ${COMPRESSION_CONFIG.MAX_TOTAL_PIXELS / 1024 / 1024}M)，需要优化`);
+          logger.debug(`图片像素过多，需要优化 (${(totalPixels / 1024 / 1024).toFixed(1)}M像素)`);
           return true;
         }
         
         // 检查单边尺寸（防止极端情况）
         if (metadata.width > COMPRESSION_CONFIG.MAX_WIDTH) {
-          console.log(`图片宽度过大 (${metadata.width}px > ${COMPRESSION_CONFIG.MAX_WIDTH}px)，需要优化`);
+          logger.debug(`图片宽度过大，需要优化 (${metadata.width}px)`);
           return true;
         }
         
         if (metadata.height > COMPRESSION_CONFIG.MAX_HEIGHT) {
-          console.log(`图片高度过大 (${metadata.height}px > ${COMPRESSION_CONFIG.MAX_HEIGHT}px)，需要优化`);
+          logger.debug(`图片高度过大，需要优化 (${metadata.height}px)`);
           return true;
         }
         
         // 检查长宽比（防止过于极端的长条图）
         if (aspectRatio > COMPRESSION_CONFIG.MAX_ASPECT_RATIO) {
-          console.log(`图片长宽比过大 (${aspectRatio.toFixed(1)}:1 > ${COMPRESSION_CONFIG.MAX_ASPECT_RATIO}:1)，需要优化`);
+          logger.debug(`图片长宽比过大，需要优化 (${aspectRatio.toFixed(1)}:1)`);
           return true;
         }
         
         // 针对长条图的特殊检查 - 适度优化以确保上传成功
         if (metadata.height > 12000 && totalPixels > 12 * 1024 * 1024) {
-          console.log(`长条图检测 (高度${metadata.height}px, ${(totalPixels / 1024 / 1024).toFixed(1)}M像素)，建议适度压缩`);
+          logger.debug(`长条图检测，建议适度压缩 (${metadata.height}px高)`);
           return true;
         }
         
       } catch (sharpError) {
-        console.warn('无法获取图片尺寸信息:', sharpError.message);
+        logger.warn('无法获取图片尺寸信息', sharpError.message);
       }
     }
     
     return false;
   } catch (error) {
-    console.error('检查图片是否需要压缩失败:', error);
+    logger.error('检查图片是否需要压缩失败', error.message);
     return false;
   }
 }
@@ -166,10 +166,10 @@ function getDynamicCompressionConfig(originalSizeMB, format, targetPixels) {
   // 对于长条图，适当提高质量以保持可读性
   if (targetPixels && targetPixels > 5 * 1024 * 1024) {
     quality = Math.min(quality + 10, 90);
-    console.log(`长条图质量补偿: 质量提升到${quality}`);
+    logger.debug(`长条图质量补偿: 质量提升到${quality}`);
   }
   
-  console.log(`智能质量设置: ${originalSizeMB.toFixed(1)}MB (压缩比${compressionRatio.toFixed(1)}x) -> ${format}质量${quality}`);
+  logger.debug(`智能质量设置: ${originalSizeMB.toFixed(1)}MB (压缩比${compressionRatio.toFixed(1)}x) -> ${format}质量${quality}`);
   
   return { quality, compressionLevel };
 }
@@ -182,7 +182,7 @@ function getDynamicCompressionConfig(originalSizeMB, format, targetPixels) {
  */
 async function compressImage(inputPath, outputPath) {
   if (!sharpAvailable) {
-    console.warn('Sharp未安装，无法压缩图片，直接复制原文件');
+    logger.warn('Sharp未安装，无法压缩图片，直接复制原文件');
     if (inputPath !== outputPath) {
       fs.copyFileSync(inputPath, outputPath);
     }
@@ -190,13 +190,13 @@ async function compressImage(inputPath, outputPath) {
   }
   
   try {
-    console.log(`开始高质量压缩图片: ${inputPath} -> ${outputPath}`);
+    logger.debug(`开始高质量压缩图片: ${inputPath} -> ${outputPath}`);
     
     const image = sharp(inputPath);
     const metadata = await image.metadata();
     const originalSizeMB = fs.statSync(inputPath).size / 1024 / 1024;
     
-    console.log(`原始图片信息: ${metadata.width}x${metadata.height}, 格式: ${metadata.format}, 大小: ${originalSizeMB.toFixed(2)}MB`);
+    logger.debug(`原始图片信息: ${metadata.width}x${metadata.height}, 格式: ${metadata.format}, 大小: ${originalSizeMB.toFixed(2)}MB`);
     
     // 获取动态压缩配置
     const targetPixels = metadata.width * metadata.height;
@@ -211,7 +211,7 @@ async function compressImage(inputPath, outputPath) {
     const totalPixels = metadata.width * metadata.height;
     const aspectRatio = Math.max(metadata.width / metadata.height, metadata.height / metadata.width);
     
-    console.log(`分析图片: ${metadata.width}x${metadata.height}, 像素${(totalPixels/1024/1024).toFixed(1)}M, 长宽比${aspectRatio.toFixed(1)}:1`);
+    logger.debug(`分析图片: ${metadata.width}x${metadata.height}, 像素${(totalPixels/1024/1024).toFixed(1)}M, 长宽比${aspectRatio.toFixed(1)}:1`);
     
     // 策略1: 基于总像素数的智能缩放
     if (totalPixels > COMPRESSION_CONFIG.MAX_TOTAL_PIXELS) {
@@ -219,7 +219,7 @@ async function compressImage(inputPath, outputPath) {
       const pixelRatio = Math.sqrt(COMPRESSION_CONFIG.MAX_TOTAL_PIXELS / totalPixels);
       newWidth = Math.round(metadata.width * pixelRatio);
       newHeight = Math.round(metadata.height * pixelRatio);
-      console.log(`基于像素数缩放: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
+      logger.debug(`基于像素数缩放: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
     // 策略2: 单边尺寸限制（但保持长宽比）
     else if (metadata.width > COMPRESSION_CONFIG.MAX_WIDTH || metadata.height > COMPRESSION_CONFIG.MAX_HEIGHT) {
@@ -230,7 +230,7 @@ async function compressImage(inputPath, outputPath) {
       
       newWidth = Math.round(metadata.width * ratio);
       newHeight = Math.round(metadata.height * ratio);
-      console.log(`基于尺寸限制缩放: 比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
+      logger.debug(`基于尺寸限制缩放: 比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
     // 策略2.5: 长条图特殊处理 - 压缩到1.6MB以下
     else if (metadata.height > 10000 && originalSizeMB > 1.4) {
@@ -240,7 +240,7 @@ async function compressImage(inputPath, outputPath) {
       const pixelRatio = Math.sqrt(targetPixels / totalPixels);
       newWidth = Math.round(metadata.width * pixelRatio);
       newHeight = Math.round(metadata.height * pixelRatio);
-      console.log(`长条图优化: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight} (目标1.6MB以下)`);
+      logger.debug(`长条图优化: 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight} (目标1.6MB以下)`);
     }
     // 策略2.6: 对于需要压缩到1.6MB以下的图片
     else if (originalSizeMB > 1.6) {
@@ -253,7 +253,7 @@ async function compressImage(inputPath, outputPath) {
       
       newWidth = Math.round(metadata.width * pixelRatio);
       newHeight = Math.round(metadata.height * pixelRatio);
-      console.log(`压缩优化: 目标${(targetPixels/1024/1024).toFixed(1)}M像素, 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
+      logger.debug(`压缩优化: 目标${(targetPixels/1024/1024).toFixed(1)}M像素, 比例${(pixelRatio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
     }
     // 策略3: 极端长宽比处理
     else if (aspectRatio > COMPRESSION_CONFIG.MAX_ASPECT_RATIO) {
@@ -266,7 +266,7 @@ async function compressImage(inputPath, outputPath) {
           const ratio = maxAllowedHeight / metadata.height;
           newWidth = Math.round(metadata.width * ratio);
           newHeight = Math.round(metadata.height * ratio);
-          console.log(`长条图优化: 限制高度比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
+          logger.debug(`长条图优化: 限制高度比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
         }
       } else {
         // 横长图：限制宽度，保持高度
@@ -275,7 +275,7 @@ async function compressImage(inputPath, outputPath) {
           const ratio = maxAllowedWidth / metadata.width;
           newWidth = Math.round(metadata.width * ratio);
           newHeight = Math.round(metadata.height * ratio);
-          console.log(`宽条图优化: 限制宽度比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
+          logger.debug(`宽条图优化: 限制宽度比例${(ratio*100).toFixed(1)}% -> ${newWidth}x${newHeight}`);
         }
       }
     }
@@ -293,9 +293,9 @@ async function compressImage(inputPath, outputPath) {
       
       const finalPixels = newWidth * newHeight;
       const reductionRatio = ((totalPixels - finalPixels) / totalPixels * 100).toFixed(1);
-      console.log(`尺寸调整完成: ${metadata.width}x${metadata.height} -> ${newWidth}x${newHeight} (像素减少${reductionRatio}%)`);
+      logger.debug(`尺寸调整完成: ${metadata.width}x${metadata.height} -> ${newWidth}x${newHeight} (像素减少${reductionRatio}%)`);
     } else {
-      console.log(`图片尺寸合适，无需调整: ${metadata.width}x${metadata.height}`);
+      logger.debug(`图片尺寸合适，无需调整: ${metadata.width}x${metadata.height}`);
     }
     
     // 根据原始格式和文件大小选择最佳压缩方式
@@ -316,7 +316,7 @@ async function compressImage(inputPath, outputPath) {
           // 保持更多色彩信息
           optimiseCoding: true
         });
-        console.log(`JPEG压缩设置: 质量${dynamicConfig.quality}, 4:4:4子采样`);
+        logger.debug(`JPEG压缩设置: 质量${dynamicConfig.quality}, 4:4:4子采样`);
         break;
         
       case 'png':
@@ -332,10 +332,10 @@ async function compressImage(inputPath, outputPath) {
         if (originalSizeMB <= 3) {
           pngOptions.quality = 100;
           pngOptions.compressionLevel = Math.min(dynamicConfig.compressionLevel, 4);
-          console.log(`PNG无损压缩: 级别${pngOptions.compressionLevel}`);
+          logger.debug(`PNG无损压缩: 级别${pngOptions.compressionLevel}`);
         } else {
           pngOptions.quality = 95;
-          console.log(`PNG高质量压缩: 级别${dynamicConfig.compressionLevel}, 质量95`);
+          logger.debug(`PNG高质量压缩: 级别${dynamicConfig.compressionLevel}, 质量95`);
         }
         
         pipeline = pipeline.png(pngOptions);
@@ -352,7 +352,7 @@ async function compressImage(inputPath, outputPath) {
           // 保持更多细节
           smartSubsample: false
         });
-        console.log(`WebP压缩设置: 质量${webpQuality}, 无损${originalSizeMB <= 1}`);
+        logger.debug(`WebP压缩设置: 质量${webpQuality}, 无损${originalSizeMB <= 1}`);
         break;
         
       default:
@@ -367,7 +367,7 @@ async function compressImage(inputPath, outputPath) {
           overshootDeringing: true,
           optimiseCoding: true
         });
-        console.log(`未知格式 ${metadata.format}，转换为高质量JPEG (质量${dynamicConfig.quality})`);
+        logger.debug(`未知格式 ${metadata.format}，转换为高质量JPEG (质量${dynamicConfig.quality})`);
         break;
     }
     
@@ -379,18 +379,18 @@ async function compressImage(inputPath, outputPath) {
     const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
     const compressedSizeMB = compressedSize / 1024 / 1024;
     
-    console.log(`图片压缩完成: ${compressedSizeMB.toFixed(2)}MB (压缩率: ${compressionRatio}%)`);
+    logger.debug(`图片压缩完成: ${compressedSizeMB.toFixed(2)}MB (压缩率: ${compressionRatio}%)`);
     
     // 文件大小检查 - 目标1.6MB以下
     if (compressedSizeMB > 1.6) {
-      console.log(`文件仍超过1.6MB (${compressedSizeMB.toFixed(2)}MB)，启动二次压缩...`);
+      logger.debug(`文件仍超过1.6MB (${compressedSizeMB.toFixed(2)}MB)，启动二次压缩...`);
       
       let attempts = 0;
       let currentSize = compressedSizeMB;
       
       while (currentSize > 1.6 && attempts < 2) {
         attempts++;
-        console.log(`第${attempts}次二次压缩 (当前${currentSize.toFixed(2)}MB)...`);
+        logger.debug(`第${attempts}次二次压缩 (当前${currentSize.toFixed(2)}MB)...`);
         
         try {
           const secondaryImage = sharp(outputPath);
@@ -426,26 +426,26 @@ async function compressImage(inputPath, outputPath) {
           fs.renameSync(outputPath + '.temp', outputPath);
           
           currentSize = fs.statSync(outputPath).size / 1024 / 1024;
-          console.log(`第${attempts}次压缩完成: ${finalWidth}x${finalHeight}, 质量${quality}, 大小${currentSize.toFixed(2)}MB`);
+          logger.debug(`第${attempts}次压缩完成: ${finalWidth}x${finalHeight}, 质量${quality}, 大小${currentSize.toFixed(2)}MB`);
           
         } catch (secondaryError) {
-          console.error(`第${attempts}次压缩失败:`, secondaryError.message);
+          logger.error(`第${attempts}次压缩失败`, secondaryError.message);
           break;
         }
       }
       
       if (currentSize > 1.6) {
-        console.warn(`警告: 经过${attempts}次压缩，文件仍为${currentSize.toFixed(2)}MB，可能影响上传`);
+        logger.warn(`警告: 经过${attempts}次压缩，文件仍为${currentSize.toFixed(2)}MB，可能影响上传`);
       } else {
-        console.log(`✅ 成功压缩到1.6MB以下: ${currentSize.toFixed(2)}MB`);
+        logger.debug(`✅ 成功压缩到1.6MB以下: ${currentSize.toFixed(2)}MB`);
       }
     } else {
-      console.log(`✅ 压缩成功，文件大小: ${compressedSizeMB.toFixed(2)}MB (< 1.6MB)`);
+      logger.debug(`✅ 压缩成功，文件大小: ${compressedSizeMB.toFixed(2)}MB (< 1.6MB)`);
     }
     
     return true;
   } catch (error) {
-    console.error('图片压缩失败:', error);
+    logger.error('图片压缩失败', error.message);
     return false;
   }
 }
@@ -501,12 +501,12 @@ async function processBase64Image(base64Data, outputPath) {
     // 清理临时文件
     if (fs.existsSync(tempPath) && tempPath !== outputPath) {
       fs.unlinkSync(tempPath);
-      console.log(`清理临时文件: ${tempPath}`);
+      logger.debug(`清理临时文件: ${tempPath}`);
     }
     
     return success;
   } catch (error) {
-    console.error('处理base64图片失败:', error);
+    logger.error('处理base64图片失败', error.message);
     return false;
   }
 }
@@ -532,7 +532,7 @@ async function getImageInfo(filePath) {
         result.height = metadata.height;
         result.format = metadata.format;
       } catch (sharpError) {
-        console.warn('无法获取图片尺寸信息:', sharpError.message);
+        logger.warn('无法获取图片尺寸信息', sharpError.message);
         result.width = '未知';
         result.height = '未知';
         result.format = '未知';
@@ -545,7 +545,7 @@ async function getImageInfo(filePath) {
     
     return result;
   } catch (error) {
-    console.error('获取图片信息失败:', error);
+    logger.error('获取图片信息失败', error.message);
     return null;
   }
 }
