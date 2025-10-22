@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { sendTextToC2C, sendTextToDirectMessage } = require('../services/messageService');
 const { processBase64Image, getImageInfo } = require('../utils/imageProcessor');
+const logger = require('../utils/logger');
 
 /**
  * 检查用户是否为管理员
@@ -44,7 +45,7 @@ function getChannelConfig() {
  */
 async function handleC2CMessage(eventData) {
   try {
-    console.log('处理QQ私信消息:', eventData);
+    const userName = eventData.author?.username || '未知用户';
     
     // 获取消息内容和相关信息
     const { content, author, id: messageId } = eventData;
@@ -52,13 +53,13 @@ async function handleC2CMessage(eventData) {
     
     // 检查是否有文本内容
     if (!content) {
-      console.log('收到无文本内容的QQ私信消息，忽略处理');
+      logger.debug('收到无文本内容的QQ私信消息，忽略处理');
       return;
     }
     
     // 消息内容预处理
     const trimmedContent = content.trim();
-    console.log('处理QQ私信消息内容:', trimmedContent);
+    logger.message('QQ私信', userName, trimmedContent);
     
     // 定义有效的命令前缀（不包含uni，uni作为默认处理）
     const validPrefixes = ['mbi', 'mbd', 'opt', 'meu'];
@@ -97,16 +98,16 @@ async function handleC2CMessage(eventData) {
       actualContent = trimmedContent;
     }
     
-    console.log(`QQ私信命令解析: 前缀=${commandPrefix}, 内容=${actualContent}`);
+    // 命令解析日志将在API调用后显示
     
     // 检查uni命令是否包含管道符号，如果包含则需要管理员权限
     if (commandPrefix === 'uni' && actualContent.includes('|')) {
       if (!isAdminUser(userId)) {
-        console.log(`用户 ${userId} 尝试使用管理员功能（uni包含|），但不是管理员`);
+        logger.warn(`非管理员用户尝试使用管理员功能`);
         await sendFilteredTextToC2C(userId, '此功能仅限管理员使用', null, messageId);
         return;
       }
-      console.log(`管理员 ${userId} 使用包含|的uni命令`);
+      logger.debug(`管理员使用管理功能`);
     }
     
     // 获取配置信息，用于调用openapi时获取group参数
@@ -123,7 +124,7 @@ async function handleC2CMessage(eventData) {
       }
       // 如果没有返回结果，静默处理，不发送回复
     } catch (apiError) {
-      console.error('调用OpenAPI错误:', apiError);
+      logger.error('调用OpenAPI错误', apiError.message);
       await sendFilteredTextToC2C(userId, '处理请求时发生错误，请稍后再试', null, messageId);
     }
     
@@ -195,11 +196,11 @@ async function handleDirectMessage(eventData) {
     // 检查uni命令是否包含管道符号，如果包含则需要管理员权限
     if (commandPrefix === 'uni' && actualContent.includes('|')) {
       if (!isAdminUser(userId)) {
-        console.log(`用户 ${userId} 尝试使用管理员功能（uni包含|），但不是管理员`);
+        logger.warn(`非管理员用户尝试使用管理员功能`);
         await sendTextToDirectMessage(guild_id, '此功能仅限管理员使用');
         return;
       }
-      console.log(`管理员 ${userId} 使用包含|的uni命令`);
+      logger.debug(`管理员使用管理功能`);
     }
     
     // 获取配置信息，用于调用openapi时获取group参数
@@ -216,7 +217,7 @@ async function handleDirectMessage(eventData) {
       }
       // 如果没有返回结果，静默处理，不发送回复
     } catch (apiError) {
-      console.error('调用OpenAPI错误:', apiError);
+      logger.error('调用OpenAPI错误', apiError.message);
       await sendTextToDirectMessage(guild_id, '处理请求时发生错误，请稍后再试', null, messageId);
     }
     
@@ -237,7 +238,7 @@ async function handleDirectMessage(eventData) {
 async function callOpenAPI(command, content, userId, groupId, userName = null) {
   try {
     if (!content) {
-      console.log(`命令 ${command} 内容为空，不执行API调用`);
+      logger.warn(`命令 ${command} 内容为空，跳过API调用`);
       return;
     }
     
@@ -273,18 +274,28 @@ async function callOpenAPI(command, content, userId, groupId, userName = null) {
     }
     
     // 发送请求
-    console.log(`发送API请求: ${API_BASE_URL}/openapi/${command}`, params);
-    
     const response = await axios.get(`${API_BASE_URL}/openapi/${command}`, { params });
     
-    console.log(`API响应结果:`, response.data);
+    // 记录发送的回复
+    if (response.data?.status === 'ok' && response.data?.data) {
+      const responseData = response.data.data;
+      if (responseData.type === 'image') {
+        // 截取base64的前20个字符作为标识
+        const base64Preview = responseData.base64 ? responseData.base64.substring(0, 20) + '...' : '';
+        logger.reply('QQ私信', `[图片:base64=${base64Preview},path=${responseData.path}]`);
+        if (responseData.message) {
+          logger.reply('QQ私信', responseData.message);
+        }
+      } else if (responseData.type === 'text') {
+        logger.reply('QQ私信', responseData.message);
+      }
+    }
     
     return response.data;
   } catch (error) {
-    console.error(`API请求失败 (${command}):`, error.message);
+    logger.error(`API请求失败 (${command})`, error.message);
     if (error.response) {
-      console.error('响应数据:', error.response.data);
-      console.error('响应状态:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
     throw error;
   }

@@ -8,13 +8,15 @@ const fs = require('fs');
 const path = require('path');
 const { sendTextToChannel, sendImageToChannel } = require('../services/messageService');
 const { processBase64Image, getImageInfo } = require('../utils/imageProcessor');
+const logger = require('../utils/logger');
 
 /**
  * 处理频道@机器人消息
  */
 async function handleChannelAtMessage(eventData, eventType = null) {
   try {
-    console.log('处理频道中@机器人消息:', eventData);
+    // 获取用户名称用于日志
+    const userName = (member && member.nick) || author.username || '未知用户';
     
     // 获取消息内容和相关信息
     // 注意：频道消息的数据结构与群聊消息不同
@@ -22,7 +24,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     
     // 检查是否有文本内容，如果没有则直接忽略
     if (!content) {
-      console.log('收到无文本内容的消息（可能是图片、表情等），忽略处理');
+      logger.debug('收到无文本内容的消息，忽略处理');
       return;
     }
     
@@ -37,14 +39,15 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     // 如果是MESSAGE_CREATE事件且包含@机器人标记，则跳过处理
     // 因为这种情况下也会收到AT_MESSAGE_CREATE事件，避免重复处理
     if (eventType === 'MESSAGE_CREATE' && containsAtBot) {
-      console.log('MESSAGE_CREATE事件包含@机器人标记，跳过处理（将由AT_MESSAGE_CREATE事件处理）');
+      logger.debug('MESSAGE_CREATE事件包含@机器人标记，跳过处理');
       return;
     }
     
     // 移除@机器人的标记（格式：<@!机器人ID>），如果存在的话
     trimmedContent = trimmedContent.replace(/<@!\d+>\s*/g, '').trim();
     
-    console.log('处理频道消息内容:', trimmedContent);
+    // 记录收到的消息
+    logger.message('频道', userName, trimmedContent);
     
     // 定义有效的命令前缀（不包含uni，uni作为默认处理）
     const validPrefixes = ['mbi', 'mbd', 'opt', 'meu'];
@@ -87,8 +90,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
     }
     
     if (isValidCommand) {
-      console.log(`收到有效命令: ${commandPrefix}`);
-      console.log(`命令内容: ${actualContent}`);
+      // 命令处理日志将在API调用后显示
       
       // 构建API请求
       const apiResponse = await callOpenAPI(commandPrefix, actualContent, author, member, guild_id);
@@ -98,7 +100,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
         await sendReplyToChannel(apiResponse.data, channel_id, messageId);
       }
     } else {
-      console.log('收到未匹配命令的消息，使用uni接口处理');
+      // 使用uni接口处理未匹配命令
       
       // 检查是否包含管道符号，如果包含则需要管理员权限
       if (trimmedContent.includes('|')) {
@@ -106,7 +108,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
         const adminUserId = channelConfig.admin_user;
         
         if (author.id !== adminUserId) {
-          console.log(`用户 ${author.id} 尝试使用管理员功能（包含|），但不是管理员 ${adminUserId}`);
+          logger.warn(`非管理员用户尝试使用管理员功能`);
           await sendTextToChannel(
             channel_id, 
             '此功能仅限管理员使用',
@@ -116,7 +118,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
           return;
         }
         
-        console.log(`管理员 ${author.id} 使用包含|的uni命令`);
+        logger.debug(`管理员使用管理功能`);
       }
       
       // 未匹配到特定命令的消息都通过uni接口处理
@@ -128,7 +130,7 @@ async function handleChannelAtMessage(eventData, eventType = null) {
       }
     }
   } catch (error) {
-    console.error('处理频道@消息失败:', error);
+    logger.error('处理频道@消息失败', error.message);
   }
 }
 
@@ -157,16 +159,8 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       const processSuccess = await processBase64Image(responseData.base64, imagePath);
       
       if (!processSuccess) {
-        console.error('图片处理失败，跳过发送');
+        logger.error('图片处理失败，跳过发送');
         return;
-      }
-      
-      console.log(`图片处理完成: ${imagePath}`);
-      
-      // 显示图片信息
-      const imageInfo = await getImageInfo(imagePath);
-      if (imageInfo) {
-        console.log(`最终图片信息: ${imageInfo.width}x${imageInfo.height}, ${imageInfo.format}, ${imageInfo.sizeMB}MB`);
       }
       
       // 获取绝对URL路径并进行URL编码
@@ -174,12 +168,9 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       const encodedFileName = encodeURIComponent(fileName);
       const imageUrl = `${serverHost}/temp_images/${encodedFileName}`;
       
-      console.log(`原始文件名: ${originalFileName}`);
-      console.log(`编码后URL: ${imageUrl}`);
-      
       // 暂时先发送文本消息，调试认证问题
       if (responseData.message) {
-        console.log('临时方案：先发送文本消息，然后发送图片');
+        // 先发送文本消息，然后发送图片
         // 转换CQ码格式
         const convertedMessage = convertCQCodeToQQFormat(responseData.message);
         await sendTextToChannel(channelId, convertedMessage, null, messageId);
@@ -187,7 +178,7 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
         try {
           await sendImageToChannel(channelId, imageUrl, '', null, messageId);
         } catch (imgError) {
-          console.error('发送图片失败，但文本已发送:', imgError.message);
+          logger.error('发送图片失败，但文本已发送', imgError.message);
         }
       } else {
         // 只发送图片
@@ -201,7 +192,7 @@ async function sendReplyToChannel(responseData, channelId, messageId) {
       await sendTextToChannel(channelId, convertedMessage, null, messageId);
     }
   } catch (error) {
-    console.error('发送频道回复失败:', error);
+    logger.error('发送频道回复失败', error.message);
   }
 }
 
@@ -240,12 +231,12 @@ async function getAccessToken() {
       throw new Error('获取访问令牌失败: ' + JSON.stringify(tokenResponse.data));
     }
     
-    console.log('成功获取访问令牌，有效期:', tokenResponse.data.expires_in, '秒');
+    logger.debug(`获取访问令牌成功，有效期: ${tokenResponse.data.expires_in}秒`);
     return tokenResponse.data.access_token;
   } catch (error) {
-    console.error('获取访问令牌错误:', error.message);
+    logger.error('获取访问令牌失败', error.message);
     if (error.response) {
-      console.error('API响应:', error.response.data);
+      logger.debug('API响应详情', error.response.data);
     }
     throw error;
   }
@@ -259,7 +250,7 @@ async function getAccessToken() {
  * @param {string} messageId - 回复的消息ID
  */
 async function sendMediaWithTextToChannel(channelId, imageUrl, text, messageId) {
-  console.warn('sendMediaWithTextToChannel已废弃，建议使用sendImageToChannel');
+  logger.warn('sendMediaWithTextToChannel已废弃，建议使用sendImageToChannel');
   
   // 直接使用新的图片发送接口
   const { sendImageToChannel } = require('../services/messageService');
@@ -282,7 +273,7 @@ function convertCQCodeToQQFormat(message) {
   const convertedMessage = message.replace(atRegex, '<@!$1>');
   
   if (convertedMessage !== message) {
-    console.log(`CQ码转换: "${message}" -> "${convertedMessage}"`);
+    logger.debug(`CQ码转换: "${message}" -> "${convertedMessage}"`);
   }
   
   return convertedMessage;
@@ -298,7 +289,7 @@ function getChannelConfig() {
     const configData = fs.readFileSync(configPath, 'utf8');
     return JSON.parse(configData);
   } catch (error) {
-    console.error('读取频道配置文件失败:', error.message);
+    logger.error('读取频道配置文件失败', error.message);
     // 返回默认配置
     return {
       channel_exchange_group: '772195107'
@@ -317,7 +308,7 @@ function getChannelConfig() {
 async function callOpenAPI(command, content, author, member, guildId) {
   try {
     if (!content) {
-      console.log(`命令 ${command} 内容为空，不执行API调用`);
+      logger.warn(`命令 ${command} 内容为空，跳过API调用`);
       return;
     }
     
@@ -350,25 +341,35 @@ async function callOpenAPI(command, content, author, member, guildId) {
         // 在频道模式下，使用 username || member.nick 作为用户名
         const userName = author.username || (member && member.nick) || `OPENAPI-${author.id}`;
         params.name = userName;
-        console.log(`频道模式用户名设置: author.username="${author.username}", member.nick="${member && member.nick}", 最终使用: "${userName}"`);
+        logger.debug(`频道模式用户名设置: 最终使用: "${userName}"`);
         // 默认群组名称为 OPENAPI-群组ID
         params.groupName = `OPENAPI-${channelConfig.channel_exchange_group}`;
         break;
     }
     
     // 发送请求
-    console.log(`发送API请求: ${API_BASE_URL}/openapi/${command}`, params);
-    
     const response = await axios.get(`${API_BASE_URL}/openapi/${command}`, { params });
     
-    console.log(`API响应结果:`, response.data);
+    // 记录发送的回复
+    if (response.data?.status === 'ok' && response.data?.data) {
+      const responseData = response.data.data;
+      if (responseData.type === 'image') {
+        // 截取base64的前20个字符作为标识
+        const base64Preview = responseData.base64 ? responseData.base64.substring(0, 20) + '...' : '';
+        logger.reply('频道', `[图片:base64=${base64Preview},path=${responseData.path}]`);
+        if (responseData.message) {
+          logger.reply('频道', responseData.message);
+        }
+      } else if (responseData.type === 'text') {
+        logger.reply('频道', responseData.message);
+      }
+    }
     
     return response.data;
   } catch (error) {
-    console.error(`API请求失败 (${command}):`, error.message);
+    logger.error(`API请求失败 (${command})`, error.message);
     if (error.response) {
-      console.error('响应数据:', error.response.data);
-      console.error('响应状态:', error.response.status);
+      logger.debug('API响应详情', { status: error.response.status, data: error.response.data });
     }
   }
 }

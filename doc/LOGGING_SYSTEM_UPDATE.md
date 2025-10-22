@@ -21,6 +21,13 @@
    - `logger.api()` - API请求日志
    - `logger.push()` - 推送操作日志
    - `logger.command()` - 命令处理日志
+   - `logger.message()` - 用户消息日志
+   - `logger.reply()` - 机器人回复日志
+
+4. **统一的消息格式**
+   - 用户消息：`[时间] [平台][用户名] 消息内容`
+   - 机器人回复：`[时间] [平台][发送] 回复内容`
+   - 图片消息：`[时间] [平台][发送] [图片:base64=预览...,path=文件路径]`
 
 ### 日志级别说明
 
@@ -55,7 +62,7 @@ LOG_LEVEL=DEBUG
 
 ### 日志输出示例
 
-**之前**:
+**之前**（过于详细）:
 ```
 2025-10-22T03:32:21.832Z - POST /qq/webhook
 签名验证调试信息:
@@ -70,13 +77,26 @@ LOG_LEVEL=DEBUG
 命令内容: 毁坏
 发送API请求: http://flanb.msharebox.com:10086/openapi/mbi {...}
 API响应结果: {...}
+从base64创建临时图片: /data/project/baibai-qq-bot/public/temp_images/31672.png.temp
+图片文件大小: 0.10MB
+图片尺寸: 400x584, 像素: 0.2M, 长宽比: 1.5:1
+图片无需压缩，直接复制: /data/project/baibai-qq-bot/public/temp_images/31672.png.temp -> /data/project/baibai-qq-bot/public/temp_images/31672.png
+清理临时文件: /data/project/baibai-qq-bot/public/temp_images/31672.png.temp
+图片处理完成: /data/project/baibai-qq-bot/public/temp_images/31672.png
+最终图片信息: 400x584, png, 0.1MB
+原始文件名: 31672.png
+编码后URL: https://flandre.com.cn/baibai//temp_images/31672.png
 ```
 
-**现在**:
+**现在**（简洁明了）:
 ```
 [2025-10-22 11:32:21] API: POST /qq/webhook
 [2025-10-22 11:32:21] INFO: 收到事件: GROUP_AT_MESSAGE_CREATE
-[2025-10-22 11:32:21] 命令: /mbi "毁坏" -> 成功
+[2025-10-22 11:32:21] [频道][芙兰朵露·斯卡雷特] 1+1
+[2025-10-22 11:32:21] [频道][发送] 1+1=2
+[2025-10-22 11:32:21] [频道][芙兰朵露·斯卡雷特] opt 求道者
+[2025-10-22 11:32:21] [频道][发送] [图片:base64=iVBORw0KGgoAAAANSUhE...,path=send/mabi/31609.png]
+[2025-10-22 11:32:21] [频道][发送] 查询到复数释放卷，请选择：...
 ```
 
 ### 优势

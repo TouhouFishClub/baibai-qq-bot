@@ -124,6 +124,22 @@ function command(cmd, content, result = null) {
   }
 }
 
+/**
+ * 消息日志（用于频道和私信）
+ */
+function message(type, user, content) {
+  const timestamp = getTimestamp();
+  console.log(`[${timestamp}] [${type}][${user}] ${content}`);
+}
+
+/**
+ * 回复日志（用于频道和私信）
+ */
+function reply(type, content) {
+  const timestamp = getTimestamp();
+  console.log(`[${timestamp}] [${type}][发送] ${content}`);
+}
+
 module.exports = {
   error,
   warn,
@@ -133,6 +149,8 @@ module.exports = {
   api,
   push,
   command,
+  message,
+  reply,
   LOG_LEVELS,
   currentLogLevel
 };
