@@ -155,7 +155,7 @@ async function handleDirectMessage(eventData) {
     console.log('处理频道私信消息内容:', trimmedContent);
     
     // 定义有效的命令前缀（不包含uni，uni作为默认处理）
-    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu'];
+    const validPrefixes = ['mbi', 'mbd', 'opt', 'meu', 'mbtv', 'mbcd'];
     
     // 检查消息是否以有效前缀开头（不区分大小写）
     let isValidCommand = false;
@@ -257,6 +257,8 @@ async function callOpenAPI(command, content, userId, groupId, userName = null) {
     // 根据不同命令添加不同的参数
     switch (command) {
       case 'opt':
+      case 'mbcd':
+      case 'mbtv':
         params.from = userId;
         break;
       case 'meu':
