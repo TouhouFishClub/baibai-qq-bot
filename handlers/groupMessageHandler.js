@@ -333,7 +333,7 @@ function getMappedGroupId(groupId) {
  */
 async function callOpenAPI(command, content, userId, groupId) {
   try {
-    if (!content) {
+    if (!content && !(command.toLowerCase() === 'mbtv' || command.toLowerCase() === 'mbcd')) {
       logger.warn(`命令 ${command} 内容为空，跳过API调用`);
       return;
     }

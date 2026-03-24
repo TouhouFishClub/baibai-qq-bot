@@ -237,7 +237,7 @@ async function handleDirectMessage(eventData) {
  */
 async function callOpenAPI(command, content, userId, groupId, userName = null) {
   try {
-    if (!content && !(command.toLowerCase() === 'mbtv' || command.toLowerCase() === 'mbtv')) {
+    if (!content && !(command.toLowerCase() === 'mbtv' || command.toLowerCase() === 'mbcd')) {
       logger.warn(`命令 ${command} 内容为空，跳过API调用`);
       return;
     }
