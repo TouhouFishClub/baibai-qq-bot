@@ -290,6 +290,41 @@ async function sendMediaWithText(groupOpenid, fileInfo, text, messageId) {
 }
 
 /**
+ * 获取映射后的群组ID
+ * 从groups.json中读取配置，如果groupId匹配且enabled为true，则返回配置的group_id
+ * @param {string} groupId - 原始群组ID
+ * @returns {string} 映射后的群组ID
+ */
+function getMappedGroupId(groupId) {
+  try {
+    const groupsConfigPath = path.join(__dirname, '../config/groups.json');
+    
+    // 检查配置文件是否存在
+    if (!fs.existsSync(groupsConfigPath)) {
+      logger.debug('groups.json配置文件不存在，使用原始groupId');
+      return groupId;
+    }
+    
+    // 读取配置文件
+    const groupsConfig = JSON.parse(fs.readFileSync(groupsConfigPath, 'utf-8'));
+    
+    // 检查是否有匹配的配置
+    if (groupsConfig[groupId] && groupsConfig[groupId].enabled === true) {
+      const mappedId = groupsConfig[groupId].group_id;
+      if (mappedId) {
+        return mappedId;
+      }
+    }
+    
+    // 没有匹配或未启用，返回原始ID
+    return groupId;
+  } catch (error) {
+    logger.error('读取群组配置失败', error.message);
+    return groupId;
+  }
+}
+
+/**
  * 调用外部OpenAPI接口
  * @param {string} command - 命令类型 (mbi, mbd, opt等)
  * @param {string} content - 实际内容
@@ -325,12 +360,18 @@ async function callOpenAPI(command, content, userId, groupId) {
         params.groupid = groupId;
         break;
       case 'uni':
-        params.group = groupId;
+        // 检查群组配置，将groupId映射为配置的group_id
+        const mappedGroupId = getMappedGroupId(groupId);
+        params.group = mappedGroupId;
         params.from = userId;
         // 默认用户名为 OPENAPI-用户ID
         params.name = `OPENAPI-${userId}`;
         // 默认群组名称为 OPENAPI-群组ID
-        params.groupName = `OPENAPI-${groupId}`;
+        params.groupName = `OPENAPI-${mappedGroupId}`;
+        
+        if (mappedGroupId !== groupId) {
+          logger.debug(`群组ID映射: ${groupId} -> ${mappedGroupId}`);
+        }
         break;
     }
     
